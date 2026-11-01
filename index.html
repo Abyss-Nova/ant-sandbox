@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>蚂蚁沙盒 · Claude小姐的小创作 #1</title>
+<style>
+  :root{--gold:#ffc65a;--ink:#f4ecdf;--panel:rgba(20,16,12,.86);--line:rgba(255,198,90,.45)}
+  html,body{margin:0;height:100%;background:#17120d;overflow:hidden;font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+  #ui{position:fixed;top:12px;left:12px;width:270px;max-height:calc(100% - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:13px;box-sizing:border-box;transition:opacity .3s}
+  #ui h1{font-size:16px;margin:0 0 2px;color:var(--gold)}
+  #ui .sub{opacity:.7;margin-bottom:10px}
+  .row{margin:8px 0}
+  .row label{display:flex;justify-content:space-between}
+  .row label b{color:var(--gold);font-weight:600}
+  input[type=range]{width:100%;accent-color:var(--gold)}
+  .btns{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  button{background:#2a2119;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer}
+  button:hover{border-color:var(--gold)}
+  button.on{background:var(--gold);color:#1a140e;border-color:var(--gold)}
+  input[type=text]{width:100%;box-sizing:border-box;background:#120e0a;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:14px}
+  .sec{margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,198,90,.2);color:var(--gold);font-weight:600}
+  #hud{position:fixed;right:16px;top:12px;font-size:14px;opacity:.85;text-shadow:0 0 8px #000;pointer-events:none}
+  #hud b{color:var(--gold)}
+  .hide #ui,.hide #hud{opacity:0;pointer-events:none}
+  #ui.folded>*:not(h1){display:none}
+  .hint{opacity:.6;font-size:12px;margin-top:8px;line-height:1.5}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud">第 <b id="hStep">0</b> 步 · 搬回的糖 <b id="hTrips">0</b></div>
+<div id="ui">
+  <h1>蚂蚁沙盒 <button id="fold" style="float:right;padding:1px 8px">收起</button></h1>
+  <div class="sub">三条规则，剩下的交给它们。</div>
+
+  <div class="sec">工具（在画面上点 / 拖）</div>
+  <div class="btns" id="tools">
+    <button data-tool="sugar" class="on">放糖</button>
+    <button data-tool="wall">画墙</button>
+    <button data-tool="erase">擦掉</button>
+    <button data-tool="nest">搬窝</button>
+    <button data-tool="scent">画气味</button>
+  </div>
+
+  <div class="sec">实验关卡</div>
+  <div class="btns" id="presets">
+    <button data-p="blank">空地</button>
+    <button data-p="routes">两条路</button>
+    <button data-p="maze">迷宫</button>
+    <button data-p="piles">三堆糖</button>
+    <button data-p="mill">死亡螺旋</button>
+  </div>
+
+  <div class="sec">参数</div>
+  <div class="row"><label>蚂蚁数量 <b id="vN">1000</b></label><input id="n" type="range" min="50" max="5000" step="50" value="1000"></div>
+  <div class="row"><label>气味消散 <b id="vE">正常</b></label><input id="evap" type="range" min="0" max="4" step="1" value="2"></div>
+  <div class="row"><label>速度 <b id="vS">×4</b></label><input id="spd" type="range" min="1" max="16" step="1" value="4"></div>
+  <div class="row"><label>乱走程度 <b id="vR">0.25</b></label><input id="noise" type="range" min="0.05" max="0.8" step="0.05" value="0.25"></div>
+  <div class="row"><label>配色</label>
+    <div class="btns" id="themes"><button data-t="amber" class="on">琥珀</button><button data-t="mint">薄荷</button><button data-t="sakura">樱花</button><button data-t="mono">黑白</button></div>
+  </div>
+
+  <div class="sec">让蚂蚁写字</div>
+  <div class="row"><input id="txt" type="text" maxlength="12" value="你好"></div>
+  <div class="btns"><button id="write">让蚂蚁写出来</button></div>
+
+  <div class="sec">其他</div>
+  <div class="btns">
+    <button id="pause">暂停</button>
+    <button id="reset">重新放蚂蚁</button>
+    <button id="shot">存成图片</button>
+    <button id="wall">桌布模式</button>
+  </div>
+  <div class="hint">桌布模式下按任意键或双击画面，面板会回来。<br>可以直接拿这个网页当 Wallpaper Engine 的网页壁纸。</div>
+</div>
+
+<script>
+'use strict';
+// ---- world ---------------------------------------------------------------
+const CELL = 4;                       // css px per grid cell
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let GW, GH, wall, food, home, foods = [], nest, ants, cfg, step = 0, trips = 0, paused = false, mill = false, glyph = null, gmask = null;
+const off = document.createElement('canvas'), octx = off.getContext('2d');
+let img;
+
+cfg = { n: 1000, evap: 0.993, spd: 4, noise: 0.25, theme: 'amber', tool: 'sugar' };
+const EVAP = [1.0, 0.998, 0.993, 0.985, 0.97], EVAPN = ['永远不散', '很慢', '正常', '较快', '很快'];
+const THEMES = {
+  amber:  { bg: [24, 19, 14], trail: [255, 190, 80], home: [40, 95, 110], ant: '#e8dcc4', carry: '#ffffff', rock: '#3a322a' },
+  mint:   { bg: [12, 22, 22], trail: [110, 255, 200], home: [80, 90, 160], ant: '#d6efe8', carry: '#ffffff', rock: '#26363a' },
+  sakura: { bg: [28, 16, 22], trail: [255, 140, 190], home: [120, 100, 170], ant: '#f6dde8', carry: '#ffffff', rock: '#3d2a33' },
+  mono:   { bg: [10, 10, 10], trail: [235, 235, 235], home: [90, 90, 90], ant: '#bbbbbb', carry: '#ffffff', rock: '#2c2c2c' },
+};
+
+function idx(x, y) { return (y | 0) * GW + (x | 0); }
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const nw = Math.ceil(innerWidth / CELL), nh = Math.ceil(innerHeight / CELL);
+  if (nw === GW && nh === GH) return;
+  GW = nw; GH = nh;
+  off.width = GW; off.height = GH; img = octx.createImageData(GW, GH);
+  load(currentPreset);
+}
+function blank() {
+  wall = new Uint8Array(GW * GH); food = new Float32Array(GW * GH); home = new Float32Array(GW * GH);
+  for (let x = 0; x < GW; x++) { wall[idx(x, 0)] = wall[idx(x, GH - 1)] = 1; }
+  for (let y = 0; y < GH; y++) { wall[idx(0, y)] = wall[idx(GW - 1, y)] = 1; }
+  foods = []; mill = false; glyph = null; gmask = null; step = 0; trips = 0;
+  nest = { x: GW * 0.15, y: GH * 0.5 };
+}
+function spawnAnts(n) {
+  const o = nest || { x: GW / 2, y: GH / 2 };
+  ants = { x: new Float32Array(n), y: new Float32Array(n), a: new Float32Array(n), has: new Uint8Array(n),
+           t: new Float32Array(n), sp: new Float32Array(n), act: new Uint8Array(n), n };
+  for (let i = 0; i < n; i++) {
+    ants.x[i] = o.x + (Math.random() - .5) * 3; ants.y[i] = o.y + (Math.random() - .5) * 3;
+    ants.a[i] = Math.random() * Math.PI * 2; ants.sp[i] = 0.8 + Math.random() * 0.4;
+  }
+}
+function ellipse(cx, cy, rx, ry, v = 1) {
+  for (let y = Math.max(1, cy - ry | 0); y < Math.min(GH - 1, cy + ry + 1); y++)
+    for (let x = Math.max(1, cx - rx | 0); x < Math.min(GW - 1, cx + rx + 1); x++)
+      if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) wall[idx(x, y)] = v;
+}
+function rectWall(x0, y0, x1, y1) {
+  for (let y = Math.max(0, y0 | 0); y < Math.min(GH, y1); y++) for (let x = Math.max(0, x0 | 0); x < Math.min(GW, x1); x++) wall[idx(x, y)] = 1;
+}
+
+// ---- presets ---------------------------------------------------------------
+let currentPreset = 'routes';
+function load(p) {
+  currentPreset = p; blank();
+  const sx = GW / 480, sy = GH / 270;
+  if (p === 'routes') {
+    nest = { x: 70 * sx, y: 135 * sy }; foods.push({ x: 410 * sx, y: 135 * sy, amt: Infinity });
+    ellipse(240 * sx, 150 * sy, 70 * sx, 80 * sy);
+  } else if (p === 'blank') {
+    nest = { x: GW / 2, y: GH / 2 };
+  } else if (p === 'piles') {
+    nest = { x: 60 * sx, y: 135 * sy };
+    for (const [x, y] of [[170, 60], [300, 215], [425, 70]]) foods.push({ x: x * sx, y: y * sy, amt: 900 });
+  } else if (p === 'maze') {
+    const cols = Math.max(4, Math.round(GW / 68)), rows = Math.max(3, Math.round(GH / 66));
+    const cw = (GW - 2) / cols, ch = (GH - 2) / rows, R = new Uint8Array(rows * cols).fill(1), D = new Uint8Array(rows * cols).fill(1);
+    const vis = new Uint8Array(rows * cols), st = [[0, 0]]; vis[0] = 1;
+    while (st.length) {
+      const [r, c] = st[st.length - 1];
+      const nb = [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dr, dc]) => [r + dr, c + dc]).filter(([a, b]) => a >= 0 && a < rows && b >= 0 && b < cols && !vis[a * cols + b]);
+      if (!nb.length) { st.pop(); continue; }
+      const [nr, nc] = nb[Math.random() * nb.length | 0];
+      if (nr === r) R[r * cols + Math.min(c, nc)] = 0; else D[Math.min(r, nr) * cols + c] = 0;
+      vis[nr * cols + nc] = 1; st.push([nr, nc]);
+    }
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const x0 = 1 + c * cw, y0 = 1 + r * ch;
+      if (R[r * cols + c] && c < cols - 1) rectWall(x0 + cw - 1.5, y0 - 1.5, x0 + cw + 1.5, y0 + ch + 1.5);
+      if (D[r * cols + c] && r < rows - 1) rectWall(x0 - 1.5, y0 + ch - 1.5, x0 + cw + 1.5, y0 + ch + 1.5);
+    }
+    nest = { x: 1 + cw / 2, y: 1 + ch / 2 }; foods.push({ x: GW - 1 - cw / 2, y: GH - 1 - ch / 2, amt: Infinity });
+  } else if (p === 'mill') {
+    mill = true; nest = null;
+  }
+  spawnAnts(cfg.n);
+  if (p === 'mill') {
+    const cx = GW / 2, cy = GH / 2, R = Math.min(GW / 3.2, GH / 2) * 0.6;
+    for (let i = 0; i < ants.n; i++) {
+      const th = Math.random() * Math.PI * 2, r = R + (Math.random() - .5) * 10;
+      ants.x[i] = cx + r * Math.cos(th) * 1.6; ants.y[i] = cy + r * Math.sin(th);
+      ants.a[i] = Math.atan2(Math.cos(th), -Math.sin(th) * 1.6); ants.act[i] = 1;
+    }
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+      const d = Math.hypot((x - cx) / 1.6, y - cy) - R; food[idx(x, y)] = 3 * Math.exp(-d * d / 30);
+    }
+  }
+  if (p === 'maze') { cfg.evapSaved = cfg.evap; }
+}
+
+// ---- simulation ------------------------------------------------------------
+const SA = 0.55, SD = 8, TURN = 0.4, TAU_D = 200, LOST = 500;
+function sense(f, x, y, a) {
+  const sx = x + SD * Math.cos(a), sy = y + SD * Math.sin(a);
+  if (sx < 0 || sy < 0 || sx >= GW || sy >= GH) return -1;
+  const i = idx(sx, sy); if (wall[i]) return -1;
+  const v = f[i]; return v < 0.005 ? 0 : v;
+}
+function tick() {
+  step++;
+  const A = ants, maze = currentPreset === 'maze';
+  const tau = maze ? 600 : TAU_D, bias = maze ? 0 : 0.08, lost = maze ? 1500 : LOST;
+  const live = foods.filter(f => f.amt > 0);
+  for (let i = 0; i < A.n; i++) {
+    if (!A.act[i]) { if (Math.random() < 0.004) A.act[i] = 1; else continue; }
+    let x = A.x[i], y = A.y[i], a = A.a[i];
+    const f = mill ? food : (A.has[i] ? home : food);
+    const inside = gmask && gmask[idx(x, y)];
+    let turn = 0;
+    if (!inside) {   // inside a letter the ant just wanders; outside it sniffs its way back
+      const L = sense(f, x, y, a - SA), C = sense(f, x, y, a), R = sense(f, x, y, a + SA);
+      if (L > C && L > R) turn = -TURN; else if (R > C && R > L) turn = TURN;
+    }
+    if (!mill && A.has[i] && A.t[i] < lost && nest) {
+      let d = Math.atan2(nest.y - y, nest.x - x) - a; d = (d + Math.PI * 3) % (Math.PI * 2) - Math.PI; turn += bias * d;
+    }
+    const nz = cfg.noise * (A.t[i] > lost ? 0.5 : 1);
+    a += turn + gauss() * nz;
+    if (!mill) {
+      if (A.has[i] && nest && Math.hypot(nest.x - x, nest.y - y) < 22) a = Math.atan2(nest.y - y, nest.x - x);
+      if (!A.has[i]) for (const fd of live) if (Math.hypot(fd.x - x, fd.y - y) < 22) { a = Math.atan2(fd.y - y, fd.x - x); break; }
+    }
+    const nx = x + A.sp[i] * Math.cos(a), ny = y + A.sp[i] * Math.sin(a);
+    const leaving = inside && !gmask[idx(nx, ny)] && Math.random() > 0.002;
+    if (leaving || nx < 1 || ny < 1 || nx >= GW - 1 || ny >= GH - 1 || wall[idx(nx, ny)]) { a += Math.PI + gauss() * 0.6; }
+    else { x = nx; y = ny; }
+    A.x[i] = x; A.y[i] = y; A.a[i] = a; A.t[i]++;
+    const k = idx(x, y);
+    if (glyph) home[k] += 0.05; else if (mill) food[k] += 0.6;
+    else if (A.has[i]) food[k] += Math.exp(-A.t[i] / tau); else home[k] += Math.exp(-A.t[i] / tau);
+    if (mill) continue;
+    if (!A.has[i]) {
+      for (const fd of live) if (fd.amt > 0 && Math.hypot(fd.x - x, fd.y - y) < 9) {
+        fd.amt--; A.has[i] = 1; A.a[i] += Math.PI; A.t[i] = 0; break;
+      }
+    } else if (nest && Math.hypot(nest.x - x, nest.y - y) < 10) {
+      A.has[i] = 0; A.a[i] += Math.PI; A.t[i] = 0; trips++;
+    }
+  }
+  if (glyph) for (const k of glyph) food[k] += 0.06;
+  if (step % 2 === 0) { diffuse(food); diffuse(home); }
+}
+const tmp = { a: null };
+function diffuse(f) {
+  // 3x3 box blur then evaporate (matches the video's simulation)
+  const ev = maybeEvap(), W = GW, H = GH;
+  if (!tmp.a || tmp.a.length !== f.length) tmp.a = new Float32Array(f.length);
+  const t = tmp.a;
+  for (let y = 0; y < H; y++) { const r = y * W; for (let x = 0; x < W; x++) {
+    const l = x > 0 ? f[r + x - 1] : f[r + x], c = f[r + x], rr = x < W - 1 ? f[r + x + 1] : f[r + x]; t[r + x] = (l + c + rr) / 3; } }
+  for (let y = 0; y < H; y++) { const r = y * W, u = (y > 0 ? y - 1 : y) * W, d = (y < H - 1 ? y + 1 : y) * W;
+    for (let x = 0; x < W; x++) { const v = (t[u + x] + t[r + x] + t[d + x]) / 3 * ev; f[r + x] = wall[r + x] ? 0 : v; } }
+}
+function maybeEvap() { return currentPreset === 'maze' && cfg.evap === 0.993 ? 0.997 : cfg.evap; }
+let spare = null;
+function gauss() { if (spare !== null) { const s = spare; spare = null; return s; }
+  let u, v, s; do { u = Math.random() * 2 - 1; v = Math.random() * 2 - 1; s = u * u + v * v; } while (!s || s >= 1);
+  const m = Math.sqrt(-2 * Math.log(s) / s); spare = v * m; return u * m; }
+
+// ---- drawing ---------------------------------------------------------------
+function draw() {
+  const th = THEMES[cfg.theme], d = img.data;
+  // keep a trail readable when the scent never fades
+  // in write mode the visible glow is the ants' footprints, not the hidden letter scent
+  const F = glyph ? home : food;
+  let kf = 1.2;
+  if (cfg.evap >= 0.998 || mill) { let m = 0; for (let i = 0; i < F.length; i += 7) if (F[i] > m) m = F[i]; kf = Math.max(glyph ? 0.4 : 1.2, m / 3); }
+  for (let i = 0, j = 0; i < food.length; i++, j += 4) {
+    if (wall[i]) { d[j] = d[j + 1] = d[j + 2] = 0; d[j + 3] = 0; continue; }
+    const fv = 1 - Math.exp(-F[i] / kf), hv = glyph ? 0 : 1 - Math.exp(-home[i] / 3);
+    d[j] = Math.min(255, th.trail[0] * fv + th.home[0] * hv * 0.35);
+    d[j + 1] = Math.min(255, th.trail[1] * fv + th.home[1] * hv * 0.35);
+    d[j + 2] = Math.min(255, th.trail[2] * fv + th.home[2] * hv * 0.35);
+    d[j + 3] = 255;
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.fillStyle = `rgb(${th.bg})`; ctx.fillRect(0, 0, innerWidth, innerHeight);
+  ctx.imageSmoothingEnabled = true;
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.filter = 'blur(8px)'; ctx.globalAlpha = 0.45; ctx.drawImage(off, 0, 0, GW * CELL, GH * CELL);
+  ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.drawImage(off, 0, 0, GW * CELL, GH * CELL);
+  ctx.globalCompositeOperation = 'source-over';
+  // rocks
+  ctx.fillStyle = th.rock;
+  for (let y = 1; y < GH - 1; y++) { let x = 1; while (x < GW - 1) {
+    if (wall[idx(x, y)]) { const x0 = x; while (x < GW - 1 && wall[idx(x, y)]) x++; ctx.fillRect(x0 * CELL, y * CELL, (x - x0) * CELL, CELL + 0.5); } else x++; } }
+  // nest
+  if (nest) { ctx.beginPath(); ctx.arc(nest.x * CELL, nest.y * CELL, 12 * CELL / 4 * 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fill(); ctx.strokeStyle = 'rgba(200,170,120,.55)'; ctx.lineWidth = 3; ctx.stroke(); }
+  // sugar
+  for (const f of foods) {
+    const frac = f.amt === Infinity ? 1 : Math.max(0, f.amt) / (f.max || 900), n = Math.ceil(7 * frac);
+    const P = [[-14, -10, 15], [8, -14, 13], [12, 6, 16], [-10, 12, 12], [-1, -1, 17], [20, -4, 9], [-22, 2, 9]];
+    const s = f.small ? 0.35 : 1;
+    for (let k = 0; k < n; k++) { const [dx, dy, r] = P[k]; ctx.fillStyle = '#f6f0e4';
+      ctx.fillRect(f.x * CELL + dx * s - r * s, f.y * CELL + dy * s - r * s, 2 * r * s, 2 * r * s); }
+  }
+  // ants
+  for (let i = 0; i < ants.n; i++) {
+    if (!ants.act[i]) continue;
+    const x = ants.x[i] * CELL, y = ants.y[i] * CELL, c = Math.cos(ants.a[i]), s = Math.sin(ants.a[i]);
+    ctx.fillStyle = th.ant; ctx.fillRect(x - c * 2 - 2, y - s * 2 - 2, 4, 4); ctx.fillRect(x + c * 2.4 - 1.5, y + s * 2.4 - 1.5, 3, 3);
+    if (ants.has[i]) { ctx.fillStyle = th.carry; ctx.fillRect(x + c * 5 - 2, y + s * 5 - 2, 4, 4); }
+  }
+  document.getElementById('hStep').textContent = step;
+  document.getElementById('hTrips').textContent = trips;
+}
+function loop() {
+  if (!paused) for (let k = 0; k < cfg.spd; k++) tick();
+  draw(); requestAnimationFrame(loop);
+}
+
+// ---- input -----------------------------------------------------------------
+let down = false;
+function at(e) { return { x: e.clientX / CELL, y: e.clientY / CELL }; }
+function paint(e) {
+  const p = at(e), r = 4;
+  if (cfg.tool === 'wall' || cfg.tool === 'erase') {
+    for (let y = p.y - r; y <= p.y + r; y++) for (let x = p.x - r; x <= p.x + r; x++) {
+      if (x < 1 || y < 1 || x >= GW - 1 || y >= GH - 1 || (x - p.x) ** 2 + (y - p.y) ** 2 > r * r) continue;
+      const i = idx(x, y);
+      if (cfg.tool === 'wall') { wall[i] = 1; food[i] = home[i] = 0; } else { wall[i] = 0; }
+    }
+    if (cfg.tool === 'erase') foods = foods.filter(f => Math.hypot(f.x - p.x, f.y - p.y) > 8);
+  } else if (cfg.tool === 'scent') {
+    for (let y = p.y - 3; y <= p.y + 3; y++) for (let x = p.x - 3; x <= p.x + 3; x++)
+      if (x > 0 && y > 0 && x < GW && y < GH) food[idx(x, y)] += 1.5;
+  }
+}
+cv.addEventListener('pointerdown', e => {
+  down = true; const p = at(e);
+  if (cfg.tool === 'sugar') foods.push({ x: p.x, y: p.y, amt: 2500, max: 2500 });
+  else if (cfg.tool === 'nest') { nest = p; mill = false; }
+  else paint(e);
+});
+cv.addEventListener('pointermove', e => { if (down && cfg.tool !== 'sugar' && cfg.tool !== 'nest') paint(e); });
+addEventListener('pointerup', () => down = false);
+
+function group(id, attr, fn) {
+  document.getElementById(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (id !== 'presets') document.querySelectorAll(`#${id} button`).forEach(x => x.classList.toggle('on', x === b));
+    fn(b.dataset[attr]);
+  });
+}
+group('tools', 'tool', v => cfg.tool = v);
+group('presets', 'p', v => { if (v === 'routes' || v === 'piles' || v === 'maze') setEvap(2); load(v); });
+group('themes', 't', v => cfg.theme = v);
+function bind(id, out, fmt, set) { const el = document.getElementById(id); const f = () => { set(+el.value); document.getElementById(out).textContent = fmt(+el.value); }; el.addEventListener('input', f); f(); }
+function setEvap(v) { const el = document.getElementById('evap'); el.value = v; el.dispatchEvent(new Event('input')); }
+bind('n', 'vN', v => v, v => { cfg.n = v; });
+document.getElementById('n').addEventListener('change', () => { spawnAnts(cfg.n); if (currentPreset === 'mill') load('mill'); });
+bind('evap', 'vE', v => EVAPN[v], v => cfg.evap = EVAP[v]);
+bind('spd', 'vS', v => '×' + v, v => cfg.spd = v);
+bind('noise', 'vR', v => v.toFixed(2), v => cfg.noise = v);
+document.getElementById('pause').onclick = e => { paused = !paused; e.target.textContent = paused ? '继续' : '暂停'; };
+document.getElementById('reset').onclick = () => { spawnAnts(cfg.n); food.fill(0); home.fill(0); step = 0; trips = 0; };
+document.getElementById('shot').onclick = () => { const a = document.createElement('a'); a.download = 'ants.png'; a.href = cv.toDataURL('image/png'); a.click(); };
+document.getElementById('wall').onclick = () => document.body.classList.add('hide');
+addEventListener('keydown', e => { if (e.target.tagName !== 'INPUT') document.body.classList.remove('hide'); });
+cv.addEventListener('dblclick', () => document.body.classList.toggle('hide'));
+document.getElementById('write').onclick = () => {
+  // the text becomes a scent stamp that never runs out; every ant just follows the scent
+  const t = document.getElementById('txt').value.trim(); if (!t) return;
+  load('blank'); nest = null; mill = true;
+  const c = document.createElement('canvas'); c.width = GW; c.height = GH; const g = c.getContext('2d');
+  const size = Math.min(GH * 0.55, GW * 0.85 / Math.max(1, [...t].length));
+  g.font = `900 ${size}px system-ui,"PingFang SC","Microsoft YaHei",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(t, GW / 2, GH / 2);
+  const px = g.getImageData(0, 0, GW, GH).data; glyph = []; gmask = new Uint8Array(GW * GH);
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) if (px[(y * GW + x) * 4 + 3] > 128) { glyph.push(y * GW + x); gmask[y * GW + x] = 1; }
+  for (let i = 0; i < ants.n; i++) {   // most ants start on the letters, a few stray ones around them
+    const k = glyph[Math.random() * glyph.length | 0], stray = Math.random() < 0.05;
+    ants.x[i] = stray ? 2 + Math.random() * (GW - 4) : k % GW + 0.5; ants.y[i] = stray ? 2 + Math.random() * (GH - 4) : (k / GW | 0) + 0.5;
+    ants.act[i] = 1;
+  }
+};
+document.getElementById('fold').onclick = e => { const u = document.getElementById('ui'); u.classList.toggle('folded'); e.target.textContent = u.classList.contains('folded') ? '展开' : '收起'; };
+addEventListener('resize', resize);
+resize();
+if (location.hash === '#record') {   // frame-exact capture for the video: the page is stepped from outside
+  window.REC = { tick(n) { for (let k = 0; k < n; k++) tick(); }, draw, load, cfg };
+} else loop();
+</script>
+</body>
+</html>
