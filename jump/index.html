@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Claude小姐跳一跳 · 整人地狱关</title>
+<title>Claude小姐跳一跳 · 进阶关</title>
 <style>
   html,body{margin:0;height:100%;background:#1b1712;color:#f6eee3;font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
   canvas{display:block;max-width:100vw;max-height:100vh;aspect-ratio:16/9;width:100vw;height:auto}
   #ui{position:fixed;left:16px;bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px}
+  #lock{opacity:.6}
   #ui button{background:#2c251d;color:#f6eee3;border:1px solid #6b5640;border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}
   #ui button.on{background:#e8833a;border-color:#e8833a;color:#1b1712;font-weight:700}
   #ui .sep{width:1px;height:22px;background:#6b5640;margin:0 4px}
@@ -31,7 +32,8 @@
 <div id="taunt"><div class="t1"></div><div class="t2"></div><div class="t3"></div><div class="t4">按空格／点一下 再来</div></div>
 <div id="ui">
   <button data-level="easy">新手村</button>
-  <button data-level="hell" class="on">地狱关</button>
+  <button data-level="hell" class="on">进阶关</button>
+  <button id="lock" title="暂不开放">地狱关 🔒</button>
   <span class="sep"></span>
   <button data-mode="play" class="on">我自己玩</button>
   <button data-mode="race">挑战第260代</button>
@@ -425,7 +427,7 @@ function jumpStep() {
 }
 function syncJump() {
   const box = document.getElementById('presets'); if (!box) return;
-  const P = state.level === 'hell' ? [[30, '30 进地狱'], [70, '70 换大脑'], [120, '120 被门挡'], [224, '224 首次通关'], [260, '260']] : [[1, '1'], [10, '10 首次通关'], [30, '30']];
+  const P = state.level === 'hell' ? [[30, '30 进进阶关'], [70, '70 换大脑'], [120, '120 被门挡'], [224, '224 首次通关'], [260, '260']] : [[1, '1'], [10, '10 首次通关'], [30, '30']];
   box.innerHTML = P.map(([g, t]) => `<button data-g="${g}">${t}</button>`).join('');
   box.querySelectorAll('button').forEach(b => b.onclick = () => { jumpTo(+b.dataset.g); b.blur(); });
 }
@@ -437,7 +439,7 @@ function newPlay(withAI) {
   else { s = new Sim({ fixed: state.fixed !== false }); if (withAI && CHAMPION) { s.genomes = [Float32Array.from(CHAMPION)]; s.runners = [makeRunner(0, s.genomes[0], rng(1))]; s.runners[0].off = -110; } else s.runners = []; s.gen = withAI ? 30 : 0; }
   state.human = hell ? makeRunner2(-1, null, rng(1)) : makeRunner(-1, null, rng(1)); state.human.off = 0;
   state.humanSim = s; state.press = false; state.started = false;
-  msg(hell ? '地狱关：13种陷阱，每一种都有一点点破绽。\n按空格／点屏幕开始，按住跳得更高' : '按空格／点屏幕开始，按住跳得更高', 0);
+  msg(hell ? '进阶关：13种陷阱，每一种都有一点点破绽。\n按空格／点屏幕开始，按住跳得更高' : '按空格／点屏幕开始，按住跳得更高', 0);
 }
 function msg(t, ms = 1800) { const m = document.getElementById('msg'); m.textContent = t; clearTimeout(msg.h); if (ms) msg.h = setTimeout(() => m.textContent = '', ms); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
@@ -449,7 +451,7 @@ function showTaunt(R, level) {
   const m = Math.round(R.dist / PX_PER_M);
   el.querySelector('.t1').textContent = pick(TAUNT[kind] || TAUNT.pit);
   el.querySelector('.t2').textContent = `${R.how}${TRAP_NAME[kind] ? '（陷阱：' + TRAP_NAME[kind] + '）' : ''} · ${m} m`;
-  el.querySelector('.t3').textContent = `${level === 'hell' ? '地狱关' : '新手村'}累计死亡 ${n} 次${streak ? '　' + streak[1] : ''}`;
+  el.querySelector('.t3').textContent = `${level === 'hell' ? '进阶关' : '新手村'}累计死亡 ${n} 次${streak ? '　' + streak[1] : ''}`;
   el.classList.add('on'); el.style.transform = `translate(-50%,-50%) rotate(${(Math.random() - 0.5) * 6}deg)`;
 }
 function hideTaunt() { document.getElementById('taunt').classList.remove('on'); }
@@ -481,7 +483,7 @@ function loop() {
       }
       if (!R.alive) {
         const lv = hell ? 'hell' : 'easy', m = Math.round(R.dist / PX_PER_M); state.best[lv] = Math.max(state.best[lv], m);
-        if (R.win) msg(hell ? `你通关了地狱关？！${deaths('hell')} 次死亡换来的。截图发评论区，我认输。` : '新手村通关！去地狱关试试？', 0);
+        if (R.win) msg(hell ? `你通关了进阶关？！${deaths('hell')} 次死亡换来的。截图发评论区，我认输。` : '新手村通关！去进阶关试试？', 0);
         else { showTaunt(R, lv); msg('', 1); }
       }
     }
@@ -490,7 +492,7 @@ function loop() {
     ctx.fillStyle = C.text; ctx.textAlign = 'left'; ctx.font = 'bold 48px "Noto Sans SC",sans-serif';
     ctx.fillText(`${Math.round(R.dist / PX_PER_M)} m`, 60, 96);
     ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillStyle = 'rgba(246,238,227,.7)';
-    ctx.fillText(`${hell ? '地狱关' : '新手村'} · 死亡 ${deaths(hell ? 'hell' : 'easy')} 次 · 最远 ${state.best[hell ? 'hell' : 'easy']} m${state.pspd !== 1 ? ' · ' + state.pspd + '× 速度' : ''}`, 60, 140);
+    ctx.fillText(`${hell ? '进阶关' : '新手村'} · 死亡 ${deaths(hell ? 'hell' : 'easy')} 次 · 最远 ${state.best[hell ? 'hell' : 'easy']} m${state.pspd !== 1 ? ' · ' + state.pspd + '× 速度' : ''}`, 60, 140);
     if (s.runners.length && s.runners[0].alive) { const A = s.runners[0]; ctx.fillStyle = '#9fd0ff'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('AI', RX + A.off + 2, A.y - 108); ctx.textAlign = 'left'; }
     if (s.runners.length) { const A = s.runners[0]; ctx.fillStyle = C.text; ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillText(`第${hell ? 260 : 30}代AI：${A.alive ? '还在跑' : (A.win ? '已通关' : A.how + ' ' + Math.round(A.dist / PX_PER_M) + ' m')}`, 60, 180); }
   }
@@ -512,6 +514,7 @@ function syncUI() {
 }
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; syncUI(); restart(); b.blur(); });
 document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { state.level = b.dataset.level; syncUI(); restart(); b.blur(); });
+document.getElementById('lock').onclick = e => { msg(pick(['地狱关：原UP主自己都打不通，暂不开放。', '先把进阶关通了再说。', '锁着呢。你连进阶都还没过吧？']), 2600); e.target.blur(); };
 document.querySelectorAll('[data-pspd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-pspd]').forEach(x => x.classList.toggle('on', x === b)); const v = +b.dataset.pspd; if (v !== state.pspd) { hideTaunt(); msg(pick(v < state.pspd ? SLOWER : FASTER), 0); clearTimeout(state.spdT); state.spdT = setTimeout(() => { if (state.mode === 'train' || state.started) msg('', 1); else msg('按空格／点屏幕开始，按住跳得更高', 0); }, 2200); } state.pspd = v; b.blur(); });
 document.querySelectorAll('[data-spd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b)); state.spd = +b.dataset.spd; b.blur(); });
 document.getElementById('course').onclick = e => { state.fixed = state.fixed === false; e.target.textContent = '地图：' + (state.fixed === false ? '随机' : '固定'); restart(); e.target.blur(); };
@@ -859,7 +862,8 @@ function drawTrap(o, st, sx, t, ref) {
 window.API = { HellSim, hellCourse, KINDS, TAUNT, HOW, TRAP_NAME, makeRunner2, stepRunner2, sense2, think2, expandGenome, crusherBottom, flyY, extentEnd, CHAMPION, Sim, makeCourse, drawWorld, drawHUD, drawGirl, drawBrain, state, ctx, W, H, FINISH, PX_PER_M, POP, speedAt, makeRunner, sense, think, stepRunner, rng };
 window.REC_MODE = location.hash.includes('record');
 if (window.REC_MODE) document.body.classList.add('rec');
-if (!window.REC_MODE) { syncUI(); newPlay(false); loop(); }
+if (location.hash.includes('clip')) { window.REC_MODE = true; syncUI(); newPlay(false); window.CLIP = { loop, down, up }; }
+else if (!window.REC_MODE) { syncUI(); newPlay(false); loop(); }
 </script>
 </body>
 </html>
