@@ -512,7 +512,7 @@ function syncUI() {
 }
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; syncUI(); restart(); b.blur(); });
 document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { state.level = b.dataset.level; syncUI(); restart(); b.blur(); });
-document.querySelectorAll('[data-pspd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-pspd]').forEach(x => x.classList.toggle('on', x === b)); const v = +b.dataset.pspd; if (v !== state.pspd) { msg(pick(v < state.pspd ? SLOWER : FASTER), 0); clearTimeout(state.spdT); state.spdT = setTimeout(() => { if (state.mode === 'train' || state.started) msg('', 1); else msg('按空格／点屏幕开始，按住跳得更高', 0); }, 2200); } state.pspd = v; b.blur(); });
+document.querySelectorAll('[data-pspd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-pspd]').forEach(x => x.classList.toggle('on', x === b)); const v = +b.dataset.pspd; if (v !== state.pspd) { hideTaunt(); msg(pick(v < state.pspd ? SLOWER : FASTER), 0); clearTimeout(state.spdT); state.spdT = setTimeout(() => { if (state.mode === 'train' || state.started) msg('', 1); else msg('按空格／点屏幕开始，按住跳得更高', 0); }, 2200); } state.pspd = v; b.blur(); });
 document.querySelectorAll('[data-spd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b)); state.spd = +b.dataset.spd; b.blur(); });
 document.getElementById('course').onclick = e => { state.fixed = state.fixed === false; e.target.textContent = '地图：' + (state.fixed === false ? '随机' : '固定'); restart(); e.target.blur(); };
 document.getElementById('go').onclick = e => { jumpTo(+document.getElementById('gen').value); e.target.blur(); };
