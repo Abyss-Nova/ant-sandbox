@@ -3,34 +3,60 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Claude小姐跳一跳 · AI进化场</title>
+<title>Claude小姐跳一跳 · 进阶关</title>
 <style>
   html,body{margin:0;height:100%;background:#1b1712;color:#f6eee3;font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
   canvas{display:block;max-width:100vw;max-height:100vh;aspect-ratio:16/9;width:100vw;height:auto}
   #ui{position:fixed;left:16px;bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px}
+  #lock{opacity:.6}
   #ui button{background:#2c251d;color:#f6eee3;border:1px solid #6b5640;border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}
   #ui button.on{background:#e8833a;border-color:#e8833a;color:#1b1712;font-weight:700}
   #ui .sep{width:1px;height:22px;background:#6b5640;margin:0 4px}
   #msg{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);font-size:min(4vw,42px);font-weight:800;text-align:center;pointer-events:none;text-shadow:0 3px 0 #000a}
   .rec #ui{display:none}
+  #msg{white-space:pre-line}
+  #taunt{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%);display:none;text-align:center;background:rgba(18,10,8,.92);border:3px solid #e8833a;border-radius:20px;padding:22px 34px;max-width:86vw;box-shadow:0 10px 40px #000a}
+  #taunt.on{display:block;animation:pop .25s ease-out}
+  @keyframes pop{from{scale:.6;opacity:0}to{scale:1;opacity:1}}
+  #taunt .t1{font-size:min(6vw,52px);font-weight:900;color:#ffd34d}
+  #taunt .t2{margin-top:10px;font-size:min(3.4vw,24px);color:#f6eee3}
+  #taunt .t3{margin-top:6px;font-size:min(3vw,20px);color:#ffb46b}
+  #taunt .t4{margin-top:14px;font-size:min(2.8vw,18px);color:#9c8a76}
+  .rec #taunt{display:none!important}
+  .clip #taunt,.clip #msg{display:none!important}
 </style>
 </head>
 <body>
 <div id="wrap"><canvas id="cv" width="1920" height="1080"></canvas></div>
 <div id="msg"></div>
+<div id="taunt"><div class="t1"></div><div class="t2"></div><div class="t3"></div><div class="t4">按空格／点一下 再来</div></div>
 <div id="ui">
-  <button data-mode="train" class="on">看AI进化</button>
-  <button data-mode="play">我自己玩</button>
-  <button data-mode="race">挑战第30代</button>
+  <button data-level="easy">新手村</button>
+  <button data-level="hell" class="on">进阶关</button>
+  <button id="lock" title="暂不开放">地狱关 🔒</button>
   <span class="sep"></span>
-  <span id="spdlbl">速度</span>
-  <button data-spd="1" class="on">1×</button>
-  <button data-spd="4">4×</button>
-  <button data-spd="20">20×</button>
-  <span class="sep"></span>
-  <button id="course">地图：固定</button>
-  <button id="brainbtn" class="on">显示大脑</button>
+  <button data-mode="play" class="on">我自己玩</button>
+  <button data-mode="race">挑战第310代</button>
+  <button data-mode="train">看AI进化</button>
+  <span class="sep playonly"></span>
+  <span class="playonly">速度</span>
+  <button class="playonly" data-pspd="0.5">0.5×</button>
+  <button class="playonly" data-pspd="0.75">0.75×</button>
+  <button class="playonly on" data-pspd="1">1×</button>
+  <button class="playonly" data-pspd="1.5">1.5×</button>
+  <button class="playonly" data-pspd="2">2×</button>
+  <span class="sep trainonly"></span>
+  <button class="trainonly on" data-spd="1">1×</button>
+  <button class="trainonly" data-spd="4">4×</button>
+  <button class="trainonly" data-spd="20">20×</button>
+  <button class="trainonly" id="course">地图：固定</button>
+  <button class="trainonly on" id="brainbtn">显示大脑</button>
+  <span class="sep trainonly"></span>
+  <span class="trainonly">跳到第</span>
+  <input class="trainonly" id="gen" type="number" min="1" max="999" style="width:64px;background:#2c251d;color:#f6eee3;border:1px solid #6b5640;border-radius:8px;padding:6px;font:inherit">
+  <button class="trainonly" id="go">代</button>
+  <span class="trainonly" id="presets" style="display:flex;gap:6px"></span>
 </div>
 <script>
 'use strict';
@@ -260,7 +286,7 @@ function drawGirl(x, y, s, t, alpha, opt = {}) {
 
 function drawWorld(sim, view) {
   const cam = sim.W0 - RX;
-  const g = ctx.createLinearGradient(0, 0, 0, GROUND); g.addColorStop(0, C.sky1); g.addColorStop(1, C.sky2);
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND); g.addColorStop(0, sim.hell ? '#1f0c0b' : C.sky1); g.addColorStop(1, sim.hell ? '#4a1a14' : C.sky2);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   // 远景：会动的代码行
   ctx.save(); ctx.globalAlpha = 0.10; ctx.fillStyle = '#ffd9b0'; ctx.font = '22px monospace';
@@ -280,7 +306,15 @@ function drawWorld(sim, view) {
   // 历代死亡标记（坟头小旗）
   if (view.flags) for (const f of view.flags) { const sx = f.x - cam; if (sx < -50 || sx > W + 50) continue; ctx.fillStyle = 'rgba(232,131,58,.5)'; ctx.fillRect(sx, GROUND - 40, 3, 40); ctx.fillText(f.label, sx + 20, GROUND - 46); }
   // 障碍
+  if (sim.hell) {
+    const ref = view.human || sim.leader() || view.lastLead || sim.runners.reduce((a, b) => a.dist > b.dist ? a : b, sim.runners[0]);
+    for (let k = Math.max(0, sim.idx - 3); k < Math.min(sim.obs.length, sim.idx + 7); k++) {
+      const o = sim.obs[k], sx = o.x - cam; if (sx > W + 300 || extentEnd(o, {}) - cam < -300 || (view.maxX && o.x > view.maxX)) continue;
+      drawTrap(o, (ref && ref.st && ref.st[k]) || {}, sx, sim.frame, ref);
+    }
+  }
   for (let k = Math.max(0, sim.idx - 2); k < Math.min(sim.obs.length, sim.idx + 6); k++) {
+    if (sim.hell) break;
     const o = sim.obs[k], sx = o.x - cam;
     if (sx > W + 40 || sx + o.w < -40) continue;
     if (o.k === 'pit') {
@@ -300,7 +334,7 @@ function drawWorld(sim, view) {
     }
   }
   // 终点
-  const fx = FINISH - cam; if (fx < W + 100) { for (let r = 0; r < 12; r++) for (let c = 0; c < 2; c++) { ctx.fillStyle = (r + c) % 2 ? '#fff' : '#222'; ctx.fillRect(fx + c * 18, GROUND - 240 + r * 20, 18, 20); } ctx.fillStyle = C.text; ctx.font = 'bold 32px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText('终点 2000m', fx + 50, GROUND - 220); }
+  const fx = (sim.finish || FINISH) - cam; if (fx < W + 100) { for (let r = 0; r < 12; r++) for (let c = 0; c < 2; c++) { ctx.fillStyle = (r + c) % 2 ? '#fff' : '#222'; ctx.fillRect(fx + c * 18, GROUND - 240 + r * 20, 18, 20); } ctx.fillStyle = C.text; ctx.font = 'bold 32px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText(sim.hell ? '真·终点' : '终点 2000m', fx + 50, GROUND - 220); }
   // 跑者
   const lead = sim.leader();
   const t = sim.frame;
@@ -311,7 +345,7 @@ function drawWorld(sim, view) {
     else if (R.win) { const k = (R.i * 37) % 23; drawGirl(sx + 40 + k * 13, GROUND - Math.abs(Math.sin((t + R.i * 7) * 0.18)) * 40, 1, 0, 0.9, { air: true }); }
     else {
       const d = sim.deaths.find(d => d.R === R); const age = d ? sim.frame - d.f : 99;
-      if (age < 40) { const yy = R.how === '掉进坑里' ? R.deathY + age * age * 0.4 : R.deathY - age * 3 + age * age * 0.15; drawGirl(sx, yy, 1, 0, Math.max(0, 0.55 * (1 - age / 40)), { dead: true }); }
+      if (age < 40) { const yy = (R.how === '掉进坑里' || R.fall) ? R.deathY + age * age * 0.4 : R.deathY - age * 3 + age * age * 0.15; drawGirl(sx, yy, 1, 0, Math.max(0, 0.55 * (1 - age / 40)), { dead: true }); }
     }
   }
   if (lead && view.star) drawGirl(lead.off + RX, lead.y, 1.12, t, 1, { air: !lead.ground, star: true });
@@ -329,88 +363,655 @@ function drawHUD(sim, view) {
     ctx.fillText(`距离 ${Math.round((lead ? lead.dist : sim.W0) / PX_PER_M)} m`, 60, 188);
     ctx.fillStyle = 'rgba(246,238,227,.65)'; ctx.fillText(`历史最佳 ${Math.round(sim.best / PX_PER_M)} m`, 60, 230);
   }
-  if (view.brain) drawBrain(sim.leader() || view.lastLead, 1340, 50, 520, 300);
+  if (view.brain) drawBrain(sim.leader() || view.lastLead, 1250, 30, 650, 440, sim.frame);
 }
-function drawBrain(R, x, y, w, h) {
-  if (!R) return;
-  ctx.save(); ctx.fillStyle = 'rgba(20,16,12,.72)'; roundRect(x, y, w, h, 18); ctx.fill();
-  ctx.fillStyle = '#f6eee3'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText('领跑者的大脑', x + 18, y + 34);
-  const labels = ['前方距离', '障碍宽度', 'Bug高度', '是坑', '是验证码', '下一个', '速度', '离地高度', '上下速度'];
-  const outL = ['起跳', '按住'];
-  const L0 = [], L1 = [], L2 = [];
-  for (let i = 0; i < NI; i++) L0.push([x + 130, y + 62 + i * (h - 80) / (NI - 1)]);
-  for (let j = 0; j < NH; j++) L1.push([x + 290, y + 70 + j * (h - 96) / (NH - 1)]);
-  for (let k = 0; k < NO; k++) L2.push([x + 430, y + 120 + k * 110]);
+//@@BRAIN_START
+// ====== 花俏版大脑面板：输入分组 → 12 个“性格神经元” → 跳／按住，外加“反射神经”与内心OS ======
+const HID_NAMES = ['求生欲', '怂', '莽', '犹豫', '直觉', '玄学', '手感', '乐观', '焦虑', '记仇', '佛系', '好奇'];
+const IN_GROUPS_2 = [['👀 前面多远', [0]], ['📏 有多宽', [1]], ['📐 有多高', [2]], ['🔎 认出是啥', 'kind'], ['⚙️ 机关状态', [26, 27]], ['⏭️ 下一个', [28]], ['👻 背后', [29]], ['🦘 离地多高', [31]], ['↕️ 上下速度', [32]]];
+const IN_GROUPS_1 = [['👀 前面多远', [0]], ['📏 有多宽', [1]], ['📐 Bug多高', [2]], ['🕳️ 是坑', [3]], ['🧩 是验证码', [4]], ['⏭️ 下一个', [5]], ['💨 速度', [6]], ['🦘 离地多高', [7]], ['↕️ 上下速度', [8]]];
+function drawBrain(R, x, y, w, h, t = 0) {
+  if (!R || !R.inp) return;
+  const big = R.inp.length === NI2, ni = R.inp.length, nh = big ? NH2 : NH, groups = big ? IN_GROUPS_2 : IN_GROUPS_1;
+  const idx = gi => gi[1] === 'kind' ? Array.from({ length: KINDS.length }, (_, k) => 3 + k) : gi[1];
+  const gAct = groups.map(gr => { let m = 0; for (const i of idx(gr)) if (Math.abs(R.inp[i]) > Math.abs(m)) m = R.inp[i]; return Math.tanh(m); });
+  ctx.save();
+  // 面板
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.15);
+  ctx.shadowColor = 'rgba(255,150,70,.55)'; ctx.shadowBlur = 18 + 10 * pulse;
+  ctx.fillStyle = 'rgba(14,10,18,.84)'; roundRect(x, y, w, h, 20); ctx.fill(); ctx.shadowBlur = 0;
+  const gb = ctx.createLinearGradient(x, y, x + w, y + h); gb.addColorStop(0, '#ff9a4a'); gb.addColorStop(0.5, '#ff5fa2'); gb.addColorStop(1, '#6ab8ff');
+  ctx.strokeStyle = gb; ctx.lineWidth = 3; roundRect(x, y, w, h, 20); ctx.stroke();
+  ctx.fillStyle = '#fff6ea'; ctx.font = 'bold 24px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText('🧠 领跑者的大脑', x + 18, y + 36);
+  ctx.fillStyle = 'rgba(246,238,227,.55)'; ctx.font = '16px "Noto Sans SC",sans-serif'; ctx.fillText(`${(big ? NPARAM2 : 106)} 个数字 · 全靠进化`, x + 220, y + 34);
+  const top = y + 64, bot = y + h - 22;
+  const L0 = groups.map((_, i) => [x + 180, top + i * (bot - top) / (groups.length - 1)]);
+  const L1 = Array.from({ length: nh }, (_, j) => [x + 360, top + 6 + j * (bot - top - 12) / (nh - 1)]);
+  const L2 = [[x + 520, y + h * 0.36], [x + 520, y + h * 0.64]];
   const g = R.g; let p = 0;
-  for (let j = 0; j < NH; j++) for (let i = 0; i < NI; i++) { const wv = g[p++]; edge(L0[i], L1[j], wv, R.inp[i]); }
-  p += NH;
-  for (let k = 0; k < NO; k++) for (let j = 0; j < NH; j++) { const wv = g[p++]; edge(L1[j], L2[k], wv, R.hid[j]); }
-  ctx.font = '15px "Noto Sans SC",sans-serif'; ctx.textAlign = 'right';
-  for (let i = 0; i < NI; i++) { node(L0[i], Math.tanh(R.inp[i]), 8); ctx.fillStyle = '#d8ccbc'; ctx.fillText(labels[i], L0[i][0] - 14, L0[i][1] + 5); }
-  for (let j = 0; j < NH; j++) node(L1[j], R.hid[j], 9);
-  ctx.textAlign = 'left';
-  for (let k = 0; k < NO; k++) { node(L2[k], R.out[k] * 2 - 1, 13); ctx.fillStyle = R.out[k] > 0.5 ? '#ffb46b' : '#9c8a76'; ctx.font = 'bold 18px "Noto Sans SC",sans-serif'; ctx.fillText(outL[k], L2[k][0] + 20, L2[k][1] + 6); }
+  // 输入→隐藏（按组合并权重）
+  const W1 = Array.from({ length: nh }, () => new Float32Array(groups.length));
+  for (let j = 0; j < nh; j++) { for (let i = 0; i < ni; i++) { const gIx = groups.findIndex(gr => idx(gr).includes(i)); if (gIx >= 0) W1[j][gIx] += g[p] * R.inp[i]; p++; } }
+  p += nh;
+  const W2 = [[], []]; for (let k = 0; k < NO; k++) for (let j = 0; j < nh; j++) W2[k][j] = g[p++] * R.hid[j];
+  p += NO;
+  const SK = [[], []]; if (big) for (let k = 0; k < NO; k++) for (let i = 0; i < ni; i++) { const gIx = groups.findIndex(gr => idx(gr).includes(i)); SK[k][gIx] = (SK[k][gIx] || 0) + g[p++] * R.inp[i]; }
+  const edge = (a, b, v, seed, curve = 0) => {
+    const s = Math.min(1, Math.abs(v) * 0.6); if (s < 0.05) return;
+    const col = v > 0 ? `rgba(255,150,70,${0.12 + s * 0.7})` : `rgba(106,184,255,${0.12 + s * 0.7})`;
+    ctx.strokeStyle = col; ctx.lineWidth = 0.8 + s * 3.2; ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 - curve; ctx.quadraticCurveTo(mx, my, b[0], b[1]); ctx.stroke();
+    if (s > 0.35) { const u = ((t * 0.045 + seed * 0.137) % 1); const qx = (1 - u) * (1 - u) * a[0] + 2 * u * (1 - u) * mx + u * u * b[0], qy = (1 - u) * (1 - u) * a[1] + 2 * u * (1 - u) * my + u * u * b[1];
+      ctx.fillStyle = v > 0 ? '#ffd9a8' : '#cfe8ff'; ctx.beginPath(); ctx.arc(qx, qy, 2.5 + s * 2, 0, 7); ctx.fill(); }
+  };
+  for (let j = 0; j < nh; j++) for (let i = 0; i < groups.length; i++) edge(L0[i], L1[j], W1[j][i], i * 13 + j);
+  for (let k = 0; k < NO; k++) for (let j = 0; j < nh; j++) edge(L1[j], L2[k], W2[k][j], j * 7 + k);
+  if (big) { ctx.setLineDash([5, 6]); for (let k = 0; k < NO; k++) for (let i = 0; i < groups.length; i++) edge(L0[i], L2[k], (SK[k][i] || 0) * 0.7, i + 50 * k, 120 + i * 6); ctx.setLineDash([]); }
+  const node = (c, v, r, glow) => {
+    const a = Math.min(1, Math.abs(v)); ctx.shadowColor = v > 0 ? '#ff9a4a' : '#6ab8ff'; ctx.shadowBlur = glow ? 6 + a * 18 : 0;
+    ctx.fillStyle = v > 0 ? `rgba(255,150,70,${0.25 + a * 0.75})` : `rgba(106,184,255,${0.25 + a * 0.75})`;
+    ctx.beginPath(); ctx.arc(c[0], c[1], r * (1 + 0.15 * a), 0, 7); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,246,234,.8)'; ctx.lineWidth = 1.2; ctx.stroke();
+  };
+  ctx.textAlign = 'right'; ctx.font = '17px "Noto Sans SC",sans-serif';
+  groups.forEach((gr, i) => { node(L0[i], gAct[i], 8, true); ctx.fillStyle = Math.abs(gAct[i]) > 0.3 ? '#fff6ea' : 'rgba(216,204,188,.6)'; ctx.fillText(gr[0], L0[i][0] - 14, L0[i][1] + 6); });
+  ctx.textAlign = 'left'; ctx.font = '15px "Noto Sans SC",sans-serif';
+  let hot = 0; for (let j = 0; j < nh; j++) if (Math.abs(R.hid[j]) > Math.abs(R.hid[hot])) hot = j;
+  for (let j = 0; j < nh; j++) { node(L1[j], R.hid[j], 8, true); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(14,10,18,.9)'; ctx.strokeText(HID_NAMES[j], L1[j][0] + 13, L1[j][1] + 5); ctx.fillStyle = j === hot ? '#ffd34d' : 'rgba(216,204,188,.75)'; ctx.fillText(HID_NAMES[j], L1[j][0] + 13, L1[j][1] + 5); }
+  if (big) { ctx.fillStyle = 'rgba(255,95,162,.8)'; ctx.font = 'bold 14px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡ 反射神经', x + 455, y + 52); }
+  const outL = ['跳！', '按住'];
+  for (let k = 0; k < NO; k++) {
+    const on = R.out[k] > 0.5; node(L2[k], R.out[k] * 2 - 1, 15, true);
+    if (on) { ctx.strokeStyle = `rgba(255,211,77,${0.6 - ((t * 0.08) % 0.6)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(L2[k][0], L2[k][1], 18 + ((t * 2) % 22), 0, 7); ctx.stroke(); }
+    ctx.fillStyle = on ? '#ffd34d' : 'rgba(216,204,188,.6)'; ctx.font = `bold ${on ? 24 : 20}px "Noto Sans SC",sans-serif`; ctx.textAlign = 'left'; ctx.fillText(outL[k], L2[k][0] + 24, L2[k][1] + 8);
+  }
+  // 内心OS
+  const os = !R.alive ? '……' : R.ground ? (R.out[0] > 0.5 ? '冲！' : Math.abs(R.hid[hot]) > 0.9 ? `（${HID_NAMES[hot]}中）` : '稳住……') : (R.out[1] > 0.5 ? '再高一点！' : '收！');
+  ctx.font = 'bold 20px "Noto Sans SC",sans-serif'; const tw = ctx.measureText(os).width + 26, bx = x + w - tw - 16, by = y + h - 58;
+  ctx.fillStyle = 'rgba(255,246,234,.95)'; roundRect(bx, by, tw, 38, 12); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(bx + tw - 30, by); ctx.lineTo(bx + tw - 18, by - 12); ctx.lineTo(bx + tw - 14, by); ctx.fill();
+  ctx.fillStyle = '#2a1810'; ctx.textAlign = 'center'; ctx.fillText(os, bx + tw / 2, by + 26);
   ctx.restore();
-  function edge(a, b, wv, act) { ctx.strokeStyle = wv > 0 ? `rgba(239,138,58,${Math.min(.85, .08 + Math.abs(wv * act) * .5)})` : `rgba(122,167,217,${Math.min(.85, .08 + Math.abs(wv * act) * .5)})`; ctx.lineWidth = Math.min(4, Math.abs(wv) * 1.4); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
-  function node(c, v, r) { ctx.fillStyle = v > 0 ? `rgba(239,138,58,${.25 + Math.abs(v) * .75})` : `rgba(122,167,217,${.25 + Math.abs(v) * .75})`; ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#f6eee3'; ctx.lineWidth = 1.2; ctx.stroke(); }
 }
+//@@BRAIN_END
 
 // ====== 第30代冠军（训练后贴进来） ======
 const CHAMPION = [1.9186, -0.4169, 0.9499, -0.1508, 0.0445, -0.9796, -0.0298, 1.4838, 0.7827, -1.8202, -1.573, -0.0909, -1.3658, -1.3883, -0.1289, -0.6757, 0.3427, 1.1116, 2.7711, 0.5912, -0.6194, 0.8641, 0.1911, -0.7464, -1.1732, 0.2041, 1.3466, -2.1662, 0.6241, -1.1579, 0.5618, -0.4152, 1.966, 2.8249, -0.2182, -0.753, 2.6904, 1.3057, -0.4335, -1.0841, -0.7806, 0.032, 0.7737, -1.3941, -1.5663, 0.8349, -0.3672, 0.2488, -0.9571, -0.6485, -1.907, -1.0924, 1.0211, 0.5721, -1.3689, -0.0324, 0.2332, 2.0352, -0.6309, -0.6098, -1.1431, -0.5618, -1.4459, 3.2827, 1.6398, -0.4931, -1.6919, 0.7485, 0.4229, -0.955, 0.4305, 0.6454, -0.5808, 0.984, 0.4817, -0.2583, -0.084, -3.879, 0.053, -0.0283, -0.6396, 0.6566, -0.9973, -0.5696, -0.0017, -0.0188, 0.4349, -1.8375, -0.2649, -1.0819, -1.9435, 2.0007, -0.1476, -0.8179, -0.0707, -0.2918, 0.4846, 0.8828];
 
 // ====== 介面 ======
-const state = { mode: 'train', spd: 1, sim: null, human: null, humanSim: null, press: false, view: { star: true, brain: true }, best: 0 };
-function newTrain() { state.sim = new Sim({ fixed: state.fixed !== false }); }
+const HELL_CHAMP = [2.0957,  0.9927,  2.6993,  -0.1101,  -5.0123,  2.672,  -0.7228,  -2.0842,  1.3213,  6.9132,  0.589,  -4.5377,  -1.9839,  2.6377,  -0.6667,  1.3197,  -1.6085,  0.5662,  0.5711,  0.4063,  -0.9062,  -0.534,  -0.9012,  0.4749,  2.5757,  3.0373,  1.836,  -0.5839,  -0.0996,  -0.7893,  -0.598,  1.609,  2.0517,  0.3253,  -3.4122,  -1.8486,  -1.755,  -1.199,  -1.8127,  3.0314,  -1.9084,  0.604,  0.2946,  -4.079,  2.8657,  -0.0829,  0.1236,  0.2365,  -1.1417,  -1.4595,  2.3681,  0.4377,  0.9272,  -1.1632,  0.9575,  -0.9598,  1.6476,  -0.7091,  -1.5507,  -3.9026,  -1.2142,  0.6376,  -0.9997,  -1.0971,  2.6159,  0.4003,  3.3934,  -0.2307,  -2.6921,  1.7204,  1.7384,  -0.251,  -1.0627,  -2.8033,  -4.9696,  1.1865,  0.1299,  1.6507,  0.2674,  0.7851,  -0.3221,  -1.2716,  1.27,  -1.5083,  -5.5465,  -1.9756,  0.4383,  -0.4299,  -1.8192,  -3.0801,  -1.0122,  0.0691,  -0.3039,  -1.364,  -0.2021,  1.8009,  -2.9828,  1.3096,  3.6194,  -3.7933,  0.9787,  -0.5912,  1.4832,  0.6747,  0.0953,  -2.0177,  -0.9874,  -1.1222,  3.289,  -4.5863,  0.3984,  1.2585,  -2.0334,  -1.261,  1.0135,  1.3563,  -0.4825,  -4.7664,  -0.0384,  -1.5797,  -0.0964,  -1.6851,  -0.8667,  1.4638,  -1.8681,  4.3297,  -0.9197,  -0.2885,  3.9015,  6.4077,  -1.0734,  0.1237,  4.0381,  -1.066,  -0.3033,  -0.6455,  -0.1795,  -2.1355,  1.0678,  2.2961,  -0.2768,  0.9264,  -1.4141,  2.9906,  3.52,  -1.3797,  -2.0541,  4.6,  0.0674,  3.5047,  -1.2694,  1.1533,  -1.9699,  -0.8812,  -2.4809,  0.3299,  2.0022,  1.2586,  1.9674,  2.5234,  -0.614,  -0.1752,  0.0169,  -2.6727,  -0.6818,  -8.1058,  -3.2337,  2.4658,  0.8791,  0.3465,  -1.4901,  -0.6116,  1.7009,  -2.9593,  0.1959,  0.1542,  -0.9455,  -3.679,  -1.5234,  0.764,  0.4829,  0.7699,  -2.2541,  -1.9183,  0.3499,  -0.0362,  1.0617,  -2.787,  -3.7618,  -3.716,  0.7602,  1.9085,  0.6559,  1.1714,  -3.3644,  1.073,  -0.096,  -0.9569,  -0.5048,  2.4428,  3.0155,  2.1314,  -1.298,  0.3237,  0.7741,  -0.7227,  -1.4496,  -0.2532,  1.0331,  1.0165,  0.6946,  -0.4174,  0.2097,  -0.4315,  -1.2156,  2.6479,  -1.9018,  -3.0506,  1.6979,  -0.7238,  -2.9435,  -2.3767,  -4.8837,  -3.5218,  -3.3787,  -0.7892,  1.3434,  -0.4031,  0.1144,  -1.4382,  -2.3974,  4.1511,  3.0632,  0.1688,  -0.2314,  0.2651,  2.702,  0.242,  0.6381,  -0.9729,  2.5785,  0.0348,  4.6545,  -0.7126,  -0.3878,  -1.2483,  0.0575,  -0.6184,  2.7638,  -0.0554,  -1.3799,  -2.0801,  -0.6873,  -0.941,  0.3847,  -0.5096,  -1.3889,  -0.5612,  2.4149,  -0.2011,  -1.1924,  0.3778,  0.8063,  1.8013,  -2.5756,  -1.2348,  -2.7398,  3.3906,  1.8285,  -1.0618,  -1.1264,  2.9831,  0.3898,  -2.2275,  -1.3,  -0.5302,  -1.1486,  -2.6985,  -0.6432,  -0.5252,  -0.5597,  -2.3248,  -0.0135,  1.9268,  -0.5577,  0.8309,  2.0239,  2.7477,  0.5269,  3.8823,  0.2352,  -1.5057,  0.1494,  1.0022,  0.4546,  1.0741,  1.9944,  3.3143,  -0.0445,  1.4175,  4.1587,  0.391,  -2.879,  -1.9459,  0.1659,  -0.5284,  3.7766,  -0.396,  -1.2899,  2.3345,  -0.998,  0.6684,  -2.5167,  -1.1863,  0.1242,  -5.1651,  -0.196,  -0.8307,  -0.2315,  -0.9319,  0.3224,  0.2434,  -0.9987,  0.2316,  -1.9282,  0.4465,  1.3683,  2.4665,  -0.0878,  0.2329,  -0.6142,  -0.7691,  1.1149,  -1.7127,  -0.3203,  -2.9539,  -1.1758,  -2.4559,  0.3114,  -2.6528,  4.1033,  -0.8809,  2.5713,  -1.9315,  0.1823,  3.0755,  -1.4596,  1.8974,  0.6173,  3.9716,  -2.1258,  -0.1943,  -1.4764,  1.2718,  1.8219,  1.3116,  -0.2895,  -1.5659,  1.3141,  -0.4967,  -0.4362,  1.5971,  -1.1646,  -1.5608,  2.4543,  -2.7628,  -1.4421,  -0.3752,  0.2519,  1.3093,  -1.172,  -0.9961,  1.5112,  -1.7507,  1.7385,  1.6167,  0.3576,  0.4725,  0.9174,  2.8331,  -0.7774,  1.7489,  0.103,  -2.2108,  0.6639,  0.9861,  -2.2347,  -0.1026,  -1.1151,  0.5692,  0.8201,  -0.3091,  2.1502,  2.057,  1.9445,  1.1877,  -2.8288,  -1.6455,  -1.553,  -4.0683,  0.6982,  -2.5775,  1.9191,  -0.3159,  -1.3005,  -0.6977,  1.5449,  -0.0017,  -0.6062,  -0.5732,  -0.9875,  -1.1463,  0.5858,  -0.8481,  0.4205,  -4.9916,  -0.4664,  -2.0909,  0.0459,  -0.0332,  -4.0089,  -1.8024,  -2.8901,  2.3812,  -1.3477,  -0.7843,  0.7348,  0.3088,  -2.0684,  3.9286,  -0.1678,  3.0002,  1.3361,  -0.4241,  -4.2783,  1.6295,  -0.9256,  1.17,  2.0538,  1.0901,  0.3818,  -0.0925,  -0.2231,  -0.2537,  -2.5418,  1.1916,  2.1872,  -0.0569,  -3.3081,  2.2052,  1.1699,  0.0263,  -0.4186,  1.5819,  1.4526,  -2.4576,  -2.6917,  -0.1019,  -1.7189,  -1.2928,  -0.2348,  1.1214,  0.7832,  -0.9894,  -0.9703,  -0.9679,  -0.5057,  0.7279,  1.0462,  2.8508,  3.4948,  -1.9234,  2.1378,  1.5247,  -2.0323,  1.8361,  1.8045,  3.564,  -0.6524,  2.1444,  -1.5848,  1.5027,  2.2496,  2.5593,  2.0505,  4.1331,  -1.595,  -3.9967,  1.2839,  2.2204,  1.1235,  1.0393,  -1.7293,  2.141,  0.232,  0.8446,  0.6475,  -1.7222,  -0.824,  0.99];
+const PLAY_BASE = 1.5;   // 玩家模式的 1× = AI 训练速度的 1.5 倍
+const SLOWER = ['调慢了？懂了，手残模式。', '慢动作也救不了你。', '要不要再慢一点？我等你。', '这个速度，我奶奶都能过。'];
+const FASTER = ['哦哟，不错哦。', '胆子挺大嘛。', '加速？我喜欢。', '这么自信？待会别哭。'];
+const state = { mode: 'play', level: 'hell', spd: 1, pspd: 1, sim: null, human: null, humanSim: null, press: false, view: { star: true, brain: true }, best: { easy: 0, hell: 0 } };
+const KIND_OF = { '掉进坑里': 'pit', '撞上Bug': 'block', '撞上验证码': 'sign' };
+function deaths(level, add) { let n = 0; try { n = +(localStorage.getItem('jump-deaths-' + level) || 0) + (add || 0); if (add) localStorage.setItem('jump-deaths-' + level, n); } catch (e) { n = (deaths.mem = (deaths.mem || 0) + (add || 0)); } return n; }
+let G30 = null;
+function gen30() { if (G30) return G30; const s = new Sim({ seed: 7 }); for (let g = 1; g < 30; g++) { s.runGenFast(); s.nextGen(); } s.runGenFast(); G30 = s.genomes; return G30; }
+function newTrain() {
+  state.announced = false; state.jumping = null;
+  // 地狱关和视频一样：第30~69代用旧大脑，第70代换新大脑
+  state.sim = state.level === 'hell' ? new HellSim({ seed: 11, genomes: gen30(), gen0: 30, blind: true }) : new Sim({ fixed: state.fixed !== false });
+  syncJump();
+}
+function advance(s) {
+  if (s.hell && s.blind && s.gen >= 69) { state.sim = new HellSim({ seed: 12, genomes: s.genomes, gen0: 70 }); msg('第70代：换新大脑！', 2500); return state.sim; }
+  s.nextGen(); return s;
+}
+// 跳到第 N 代：分批快速计算，不卡画面
+function jumpTo(n) {
+  const min = state.level === 'hell' ? 30 : 1;
+  n = Math.max(min, Math.min(999, Math.round(n) || min));
+  if (n < state.sim.gen || (n === state.sim.gen && state.sim.frame > 0)) newTrain();
+  state.jumping = n; state.announced = true;
+}
+function jumpStep() {
+  const t0 = performance.now();
+  let s = state.sim;
+  while (s.gen < state.jumping && performance.now() - t0 < 30) { s.runGenFast(); s = advance(s); }
+  if (s.gen >= state.jumping) { state.jumping = null; msg(`第 ${s.gen} 代`, 1500); }
+  else msg(`计算中…… 第 ${s.gen} / ${state.jumping} 代`, 0);
+}
+function syncJump() {
+  const box = document.getElementById('presets'); if (!box) return;
+  const P = state.level === 'hell' ? [[30, '30 进进阶关'], [70, '70 换大脑'], [140, '140 被门挡'], [200, '200 又卡住了'], [277, '277 首次通关'], [310, '310']] : [[1, '1'], [10, '10 首次通关'], [30, '30']];
+  box.innerHTML = P.map(([g, t]) => `<button data-g="${g}">${t}</button>`).join('');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => { jumpTo(+b.dataset.g); b.blur(); });
+}
 function newPlay(withAI) {
-  const s = new Sim({ fixed: state.fixed !== false });
-  if (withAI && CHAMPION) { s.genomes = [Float32Array.from(CHAMPION)]; s.runners = [makeRunner(0, s.genomes[0], rng(1))]; s.runners[0].off = -110; }
-  else s.runners = [];
-  s.gen = withAI ? 30 : 0;
-  state.human = makeRunner(-1, null, rng(1)); state.humanSim = s; state.press = false; state.started = false; msg('按空格／点屏幕开始。按住跳得更高', 0);
+  hideTaunt();
+  const hell = state.level === 'hell';
+  let s;
+  if (hell) { s = new HellSim({ seed: 1, genomes: [HELL_CHAMP], gen0: 310 }); s.runners = withAI ? [s.runners[0]] : []; if (withAI) s.runners[0].off = -110; }
+  else { s = new Sim({ fixed: state.fixed !== false }); if (withAI && CHAMPION) { s.genomes = [Float32Array.from(CHAMPION)]; s.runners = [makeRunner(0, s.genomes[0], rng(1))]; s.runners[0].off = -110; } else s.runners = []; s.gen = withAI ? 30 : 0; }
+  state.human = hell ? makeRunner2(-1, null, rng(1)) : makeRunner(-1, null, rng(1)); state.human.off = 0;
+  state.humanSim = s; state.press = false; state.started = false; state.deadT = 0;
+  msg(hell ? '进阶关：20种陷阱，每一种都有一点点破绽。\n按空格／点屏幕开始，按住跳得更高' : '按空格／点屏幕开始，按住跳得更高', 0);
 }
 function msg(t, ms = 1800) { const m = document.getElementById('msg'); m.textContent = t; clearTimeout(msg.h); if (ms) msg.h = setTimeout(() => m.textContent = '', ms); }
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+function showTaunt(R, level) {
+  const kind = R.kind || KIND_OF[R.how] || 'pit';
+  const n = deaths(level, 1);
+  const el = document.getElementById('taunt');
+  const streak = STREAK.find(([k]) => n >= k && n % k === 0);
+  const m = Math.round(R.dist / PX_PER_M);
+  el.querySelector('.t1').textContent = pick(TAUNT[kind] || TAUNT.pit);
+  el.querySelector('.t2').textContent = `${R.how}${TRAP_NAME[kind] ? '（陷阱：' + TRAP_NAME[kind] + '）' : ''} · ${m} m`;
+  el.querySelector('.t3').textContent = `${level === 'hell' ? '进阶关' : '新手村'}累计死亡 ${n} 次${streak ? '　' + streak[1] : ''}`;
+  el.classList.add('on'); el.style.transform = `translate(-50%,-50%) rotate(${(Math.random() - 0.5) * 6}deg)`;
+}
+function hideTaunt() { document.getElementById('taunt').classList.remove('on'); }
 
 function loop() {
   if (state.mode === 'train') {
     const s = state.sim;
-    for (let k = 0; k < state.spd; k++) { if (s.done) { const h = s.history[s.history.length - 1]; if (h.wins && !state.announced) { state.announced = true; msg(`第 ${s.gen} 代有 ${h.wins} 个到达终点！`, 3000); } s.nextGen(); } s.tick(); }
-    drawWorld(s, state.view); drawHUD(s, state.view);
+    if (state.jumping) jumpStep();
+    else for (let k = 0; k < state.spd; k++) { let s2 = state.sim; if (s2.done) { const h = s2.history[s2.history.length - 1]; if (h.wins && !state.announced) { state.announced = true; msg(`第 ${s2.gen} 代有 ${h.wins} 个到达终点！`, 3000); } s2 = advance(s2); } s2.tick(); }
+    drawWorld(state.sim, state.view); drawHUD(state.sim, state.view);
   } else {
-    const s = state.humanSim, R = state.human;
-    if (R.alive && state.started) {
-      s.W0 += speedAt(s.W0); s.frame++;
-      while (s.idx < s.obs.length && s.obs[s.idx].x + s.obs[s.idx].w < s.W0 - 200) s.idx++;
-      stepRunner(R, s.W0, s.obs, s.idx, state.press ? (R.ground ? true : null) : false);
-      for (const A of s.runners) { if (!A.alive) continue; sense(A, s.W0, s.obs, s.idx); think(A.g, A.inp, A.hid, A.out); const pr = A.ground ? A.out[0] > 0.5 : A.out[1] > 0.5; stepRunner(A, s.W0, s.obs, s.idx, A.ground ? pr : (pr ? null : false)); }
-      if (!R.alive) { const m = Math.round(R.dist / PX_PER_M); state.best = Math.max(state.best, m); msg(R.win ? `通关！2000 m` : `${R.how}… ${m} m（最佳 ${state.best} m）　按空格再来`, 0); }
+    const s = state.humanSim, R = state.human, hell = !!s.hell;
+    const now = performance.now(); const dt = Math.min(0.1, (now - (state.lastT || now)) / 1000); state.lastT = now;
+    state.acc = (state.acc || 0) + dt * 60 * PLAY_BASE * state.pspd;      // 固定每秒 60 步，再乘上游玩速度（高刷新率屏幕也不会变快）
+    while (state.acc >= 1 && R.alive && state.started) {
+      state.acc -= 1;
+      s.frame++;
+      if (hell) {
+        s.W0 += HELL_SPEED;
+        while (s.idx < s.obs.length && extentEnd(s.obs[s.idx], {}) + 900 < s.W0 - 200) s.idx++;
+        stepRunner2(R, s.W0, s.obs, s.idx, state.press ? (R.ground ? true : null) : false);
+        if (R.alive && R.dist >= s.finish) { R.win = true; R.alive = false; R.deathAt = R.dist; }
+        for (const A of s.runners) { if (!A.alive) continue; sense2(A, s.W0, s.obs, s.idx); think2(A.g, A.inp, A.hid, A.out); const pr = A.ground ? A.out[0] > 0.5 : A.out[1] > 0.5; stepRunner2(A, s.W0, s.obs, s.idx, A.ground ? pr : (pr ? null : false)); if (A.alive && A.dist >= s.finish) { A.win = true; A.alive = false; A.deathAt = A.dist; } }
+      } else {
+        s.W0 += speedAt(s.W0);
+        while (s.idx < s.obs.length && s.obs[s.idx].x + s.obs[s.idx].w < s.W0 - 200) s.idx++;
+        stepRunner(R, s.W0, s.obs, s.idx, state.press ? (R.ground ? true : null) : false);
+        for (const A of s.runners) { if (!A.alive) continue; sense(A, s.W0, s.obs, s.idx); think(A.g, A.inp, A.hid, A.out); const pr = A.ground ? A.out[0] > 0.5 : A.out[1] > 0.5; stepRunner(A, s.W0, s.obs, s.idx, A.ground ? pr : (pr ? null : false)); }
+      }
+      if (!R.alive) {
+        const lv = hell ? 'hell' : 'easy', m = Math.round(R.dist / PX_PER_M); state.best[lv] = Math.max(state.best[lv], m);
+        if (R.win) msg(hell ? `你通关了进阶关？！${deaths('hell')} 次死亡换来的。截图发评论区，我认输。` : '新手村通关！去进阶关试试？', 0);
+        else { showTaunt(R, lv); msg('', 1); state.deadT = performance.now(); }
+      }
     }
+    if (!state.started || !R.alive) state.acc = 0;
     drawWorld(s, { human: R, star: false, ghost: 0.9 });
     ctx.fillStyle = C.text; ctx.textAlign = 'left'; ctx.font = 'bold 48px "Noto Sans SC",sans-serif';
     ctx.fillText(`${Math.round(R.dist / PX_PER_M)} m`, 60, 96);
-    if (s.runners.length && s.runners[0].alive) { const A = s.runners[0]; ctx.fillStyle = '#9fd0ff'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('AI', RX + A.off + 2, A.y - 108); ctx.textAlign = 'left'; ctx.fillStyle = C.text; }
-    if (s.runners.length) { const A = s.runners[0]; ctx.font = '28px "Noto Sans SC",sans-serif'; ctx.fillText(`第30代AI：${A.alive ? '还在跑' : (A.win ? '已通关' : A.how + ' ' + Math.round(A.dist / PX_PER_M) + ' m')}`, 60, 144); }
+    ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillStyle = 'rgba(246,238,227,.7)';
+    ctx.fillText(`${hell ? '进阶关' : '新手村'} · 死亡 ${deaths(hell ? 'hell' : 'easy')} 次 · 最远 ${state.best[hell ? 'hell' : 'easy']} m${state.pspd !== 1 ? ' · ' + state.pspd + '× 速度' : ''}`, 60, 140);
+    if (!R.alive && !R.win && state.deadT) {   // 死亡动画：死亡地点慢慢飘起一个“菜”，3 秒后才能重来
+      const age = (performance.now() - state.deadT) / 1000, left = Math.max(0, 3 - age);
+      const sx = R.deathAt - (s.W0 - RX), y = Math.min(GROUND, R.deathY ?? R.y) - 110 - Math.min(age, 3) * 40;
+      ctx.save(); ctx.globalAlpha = Math.min(1, age * 2.5); ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+      ctx.font = `900 ${Math.round(90 + Math.min(age, 3) * 25)}px "Noto Sans SC",sans-serif`; ctx.lineWidth = 12; ctx.strokeStyle = '#173312'; ctx.strokeText('菜', sx, y);
+      ctx.fillStyle = '#7bd65a'; ctx.fillText('菜', sx, y); ctx.restore();
+      const t4 = document.querySelector('#taunt .t4'), pct = Math.round(Math.min(1, age / 3) * 50) * 2;
+      const want = left > 0 ? `<span style="display:inline-block;width:220px;height:10px;border-radius:5px;background:linear-gradient(90deg,#e8833a ${pct}%,rgba(255,255,255,.12) ${pct}%)"></span>` : '按空格／点一下 再来';
+      if (t4 && t4.dataset.w !== want) { t4.dataset.w = want; t4.innerHTML = want; }
+    }
+    if (s.runners.length && s.runners[0].alive) { const A = s.runners[0]; ctx.fillStyle = '#9fd0ff'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('AI', RX + A.off + 2, A.y - 108); ctx.textAlign = 'left'; }
+    if (s.runners.length) { const A = s.runners[0]; ctx.fillStyle = C.text; ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillText(`第${hell ? 310 : 30}代AI：${A.alive ? '还在跑' : (A.win ? '已通关' : A.how + ' ' + Math.round(A.dist / PX_PER_M) + ' m')}`, 60, 180); }
   }
   if (!window.REC_MODE) requestAnimationFrame(loop);
 }
-function down() { if (state.mode === 'train') return; if (!state.human.alive) { newPlay(state.mode === 'race'); return; } if (!state.started) { state.started = true; msg('', 1); } state.press = true; }
+function down() { if (state.mode === 'train') return; if (!state.human.alive) { if (!state.human.win && state.deadT && performance.now() - state.deadT < 3000) return; newPlay(state.mode === 'race'); return; } if (!state.started) { state.started = true; msg('', 1); } state.press = true; }
 function up() { state.press = false; }
 addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); if (!e.repeat) down(); } });
 addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp') up(); });
-cv.addEventListener('pointerdown', down); addEventListener('pointerup', up);
-document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
-  document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
-  state.mode = b.dataset.mode; if (state.mode === 'train') newTrain(); else newPlay(state.mode === 'race'); b.blur();
-});
+cv.addEventListener('pointerdown', down); document.getElementById('taunt').addEventListener('pointerdown', down); addEventListener('pointerup', up);
+function restart() { if (state.mode === 'train') newTrain(); else newPlay(state.mode === 'race'); }
+function syncUI() {
+  document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x.dataset.mode === state.mode));
+  document.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('on', x.dataset.level === state.level));
+  document.querySelector('[data-mode=race]').textContent = state.level === 'hell' ? '挑战第310代' : '挑战第30代';
+  document.querySelectorAll('.trainonly').forEach(x => x.style.display = state.mode === 'train' ? '' : 'none');
+  document.querySelectorAll('.playonly').forEach(x => x.style.display = state.mode === 'train' ? 'none' : '');
+  if (state.level === 'hell') { document.getElementById('course').style.display = 'none'; document.getElementById('brainbtn').style.display = 'none'; }
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; syncUI(); restart(); b.blur(); });
+document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { state.level = b.dataset.level; syncUI(); restart(); b.blur(); });
+document.getElementById('lock').onclick = e => { msg(pick(['地狱关：原UP主自己都打不通，暂不开放。', '先把进阶关通了再说。', '锁着呢。你连进阶都还没过吧？']), 2600); e.target.blur(); };
+document.querySelectorAll('[data-pspd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-pspd]').forEach(x => x.classList.toggle('on', x === b)); const v = +b.dataset.pspd; if (v !== state.pspd) { hideTaunt(); msg(pick(v < state.pspd ? SLOWER : FASTER), 0); clearTimeout(state.spdT); state.spdT = setTimeout(() => { if (state.mode === 'train' || state.started) msg('', 1); else msg('按空格／点屏幕开始，按住跳得更高', 0); }, 2200); } state.pspd = v; b.blur(); });
 document.querySelectorAll('[data-spd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b)); state.spd = +b.dataset.spd; b.blur(); });
-document.getElementById('course').onclick = e => { state.fixed = state.fixed === false; e.target.textContent = '地图：' + (state.fixed === false ? '随机' : '固定'); if (state.mode === 'train') newTrain(); else newPlay(state.mode === 'race'); e.target.blur(); };
+document.getElementById('course').onclick = e => { state.fixed = state.fixed === false; e.target.textContent = '地图：' + (state.fixed === false ? '随机' : '固定'); restart(); e.target.blur(); };
+document.getElementById('go').onclick = e => { jumpTo(+document.getElementById('gen').value); e.target.blur(); };
+document.getElementById('gen').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { jumpTo(+e.target.value); e.target.blur(); } });
 document.getElementById('brainbtn').onclick = e => { state.view.brain = !state.view.brain; e.target.classList.toggle('on', state.view.brain); e.target.blur(); };
-if (!CHAMPION) document.querySelector('[data-mode=race]').style.display = 'none';
+//@@HELL_START
+// ====== 第二关：地狱 ======
+const HELL_SPEED = 12;
+const KINDS = ['pit', 'block', 'sign', 'crack', 'hblock', 'charger', 'paper', 'mimic', 'crusher', 'pad', 'backstab', 'fakebug', 'widen', 'flybug', 'gate', 'fakeland', 'hidpit', 'mirror', 'dropbug', 'conveyor', 'popspike', 'movpit', 'ceiling'];
+const NI2 = 33, NH2 = 12, NO2 = 2;   // 输入：距离、宽、高、23种类型、2个机关状态、下一个、背后、速度、高度、竖直速度
+const NPARAM2 = NI2 * NH2 + NH2 + NH2 * NO2 + NO2 + NI2 * NO2;   // 最后一段：输入直通输出的“反射神经”
+const TRAP_NAME = { crack: '豆腐渣地板', hblock: '隐形砖', charger: '冲锋Bug', paper: '纸老虎', mimic: '假终点', crusher: '偷看你的404', pad: '加速板', backstab: '背刺Bug', fakebug: '假Bug真坑', widen: '会长大的坑', flybug: '飞虫', gate: '犹豫之门', fakeland: '假落地点', hidpit: '隐形坑', mirror: '学人精Bug', dropbug: '天降Bug', conveyor: '加速带', popspike: '地刺', movpit: '会走的坑', ceiling: '低天花板' };
+const HOW = {
+  pit: '掉进坑里', block: '撞上Bug', sign: '撞上验证码', crack: '地板塌了', hblock: '被隐形砖弹进坑里', charger: '被冲锋Bug撞飞', paper: '撞上隐形刺',
+  mimic: '被终点吃掉', crusher: '被压扁', pad: '被弹上天花板', backstab: '被背刺', fakebug: '掉进陷阱门', widen: '坑变宽了', flybug: '被飞虫撞到', gate: '被关在门外', fakeland: '假落地点塌了',
+  hidpit: '掉进看不见的坑', mirror: '被学人精Bug顶到', dropbug: '被天上掉下来的Bug砸中', conveyor: '跑太快掉进坑里', popspike: '被地刺扎到', movpit: '坑自己走过来了', ceiling: '撞上天花板'
+};
+const TAUNT = {
+  pit: ['坑这么大你都看不见？', '重力：谢谢惠顾。', '建议下次带降落伞。'],
+  block: ['这个Bug是feature。', 'Bug都躲不开，还想上线？'],
+  sign: ['请证明你不是机器人。哦，你是。', '验证失败，请重试（重试也没用）。'],
+  crack: ['地板：我只是看起来很结实。', '豆腐渣工程，了解一下。', '你脚下的不是地板，是信任。'],
+  hblock: ['跳那么高干嘛，炫耀吗？', '头铁是吧？', '天花板：我一直都在。'],
+  charger: ['Bug也会长腿的，懂？', '它跑得比你修Bug还快。'],
+  paper: ['是纸做的啊！你跳什么跳？', '吓唬你的，你还真信。', '怂了吧？'],
+  mimic: ['真以为这么容易就通关了？', '恭喜通关！（骗你的）', '终点：我饿了。'],
+  crusher: ['它在等你自投罗网，你还真来了。', '扁平化设计，懂？', '404：你的人生未找到。'],
+  pad: ['免费的东西最贵。', '加速成功！加速去世。', '一飞冲天，字面意思。'],
+  backstab: ['背后也要长眼睛啊。', '最好的队友，往往从背后来。'],
+  fakebug: ['那个Bug是假的，坑是真的。', '你躲得很好，可惜躲错了。'],
+  widen: ['坑也是会长大的。', '你在成长，坑也是。'],
+  flybug: ['它飞得比你想得还低。', '节奏感：零分。'],
+  gate: ['门本来是开着的，是你自己犹豫的。', '犹豫就会败北。', '跳什么跳，走过去就好了。'],
+  fakeland: ['落地的地方也要看清楚喔～', '跳过去了，然后呢？'],
+  hidpit: ['看不见的坑，才是好坑。', '眼睛是用来看的，不是用来眨的。'],
+  mirror: ['它学你跳，你倒是跳高一点啊。', '模仿是最高级的嘲讽。'],
+  dropbug: ['Bug从天而降，你从人间消失。', '抬头看看影子嘛。'],
+  conveyor: ['跑这么快，赶着投胎？', '速度与激情，主要是激情。'],
+  popspike: ['地板会长刺，正常。', '扎心了吧？'],
+  movpit: ['坑也有腿，懂？', '你在找坑，坑也在找你。'],
+  ceiling: ['跳那么高，天花板都替你疼。', '低调点，字面意思。']
+};
+const STREAK = [[100, '一百次了。要不要考虑换个游戏？'], [50, '键盘还好吗？'], [30, '桌子还在吗？'], [10, '要不要休息一下？']];
 
-window.API = { Sim, makeCourse, drawWorld, drawHUD, drawGirl, drawBrain, state, ctx, W, H, FINISH, PX_PER_M, POP, speedAt, makeRunner, sense, think, stepRunner, rng };
+function hellCourse() {
+  const seq = [
+    { k: 'crack', w: 160 }, { k: 'block', w: 70, h: 90 }, { k: 'hblock', w: 120 }, { k: 'paper', w: 60 }, { k: 'charger', w: 60 },
+    { k: 'pit', w: 180 }, { k: 'fakebug', w: 60, h: 90, td: 420 }, { k: 'sign', w: 110 }, { k: 'pad', w: 80 }, { k: 'crusher', w: 120 },
+    { k: 'widen', w: 120 }, { k: 'backstab', w: 50 }, { k: 'gate', w: 50 }, { k: 'flybug', w: 60 }, { k: 'fakeland', w: 140, w2: 200 },
+    // 后半段：7种新陷阱
+    { k: 'hidpit', w: 160 }, { k: 'mirror', w: 60, h: 70 }, { k: 'conveyor', w: 500 }, { k: 'dropbug', w: 70, h: 90 },
+    { k: 'popspike', w: 100 }, { k: 'movpit', w: 180 }, { k: 'ceiling', w: 80 },
+    // 组合：陷阱互相配合
+    { k: 'crack', w: 140 }, { k: 'hidpit', w: 150, gap: 320 },
+    { k: 'conveyor', w: 420 }, { k: 'widen', w: 110, gap: 260 },
+    { k: 'dropbug', w: 70, h: 90 }, { k: 'popspike', w: 100, gap: 380 },
+    { k: 'fakebug', w: 60, h: 90, td: 380 }, { k: 'mirror', w: 60, h: 70, gap: 520 },
+    { k: 'paper', w: 60 }, { k: 'hidpit', w: 150, gap: 120 },
+    { k: 'movpit', w: 170 }, { k: 'flybug', w: 60, gap: 420 },
+    { k: 'charger', w: 60 }, { k: 'ceiling', w: 80, gap: 900 },
+    { k: 'block', w: 60, h: 120, gap: 420 }, { k: 'sign', w: 100, gap: 560 }, { k: 'hblock', w: 120 }, { k: 'mimic', w: 40 },
+
+  ];
+  const obs = []; let x = 1400;
+  for (const s of seq) {
+    if (s.gap) x = obs[obs.length - 1].x + extentEnd(obs[obs.length - 1], {}) - obs[obs.length - 1].x + s.gap;
+    const o = Object.assign({ x }, s); delete o.gap; obs.push(o);
+    x = extentEnd(o, {}) + 1000;
+  }
+  return { obs, finish: obs[obs.length - 1].x + 900 };
+}
+function extentEnd(o, st) {
+  switch (o.k) {
+    case 'fakeland': return o.x + o.w + o.w2;
+    case 'fakebug': return o.x + o.w + o.td;
+    case 'widen': return o.x + o.w + 200;
+    case 'paper': return o.x + o.w + 260;
+    case 'hblock': return o.x + o.w + 60;
+    case 'charger': return o.x + (st.dx || 0) + o.w;
+    case 'gate': return o.x + o.w;
+    case 'backstab': return o.x + 900;
+    case 'conveyor': return o.x + o.w + 150 + 170;
+    case 'movpit': return o.x + 200 + o.w;
+    case 'ceiling': return o.x + o.w + 250;
+    default: return o.x + o.w;
+  }
+}
+function crusherBottom(st) {
+  if (!st.trig) return GROUND - 460;
+  const t = st.t;
+  if (t < 12) return GROUND - 460 + Math.min(460, t * 40);
+  if (t < 24) return GROUND;
+  return Math.max(GROUND - 460, GROUND - (t - 24) * 10);
+}
+function dropLift(st) { return st.fall ? Math.max(0, 900 - st.fall * 45) : 900; }
+function movS(st) { return 200 * Math.sin(2 * Math.PI * (st.t || 0) / 80); }
+function mirLift(st) { return st.y || 0; }
+function flyY(st) { return GROUND - 150 + 110 * Math.sin(2 * Math.PI * (st.t || 0) / 64); }
+const S_ = (R, k) => R.st[k] || (R.st[k] = {});
+
+function makeRunner2(i, g, r) { const R = makeRunner(i, g, r); R.st = {}; R.inp = new Float32Array(NI2); R.hid = new Float32Array(NH2); R.out = new Float32Array(NO2); R.killer = -1; return R; }
+
+function stepRunner2(R, W0, obs, idx, press) {
+  if (!R.alive) return;
+  const px = W0 + R.off;
+  if (press !== null) {
+    if (press && R.ground && !R.fall) { R.vy = JV; R.ground = false; R.held = true; R.jumps++; R.justJumped = true; }
+    if (!press) { if (R.vy < CUT) R.vy = CUT; R.held = false; }
+  }
+  if (!R.ground) { R.vy += GRAV; R.y += R.vy; }
+  const lo = Math.max(0, idx - 2), hi = Math.min(obs.length, idx + 5);
+  // 触发
+  for (let k = lo; k < hi; k++) {
+    const o = obs[k], st = S_(R, k);
+    switch (o.k) {
+      case 'crack': if (R.ground && px > o.x + 4 && px < o.x + o.w - 4) st.broke = true; break;
+      case 'fakeland': if (R.ground && px > o.x + o.w + 4 && px < o.x + o.w + o.w2 - 4) st.broke = true; break;
+      case 'widen': if (!R.ground && px > o.x - 350 && px < o.x + o.w) st.wide = true; break;
+      case 'charger': if (o.x - px < 700) st.dx = (st.dx || 0) - 8; break;
+      case 'crusher':
+        if (!st.trig && !R.ground && px > o.x - 720 && px < o.x - 330) { st.trig = 'bait'; st.t = 0; }
+        if (!st.trig && px > o.x - 150) { st.trig = 'prox'; st.t = 0; }
+        if (st.trig) st.t++; break;
+      case 'backstab': if (!st.on && px > o.x) { st.on = true; st.bx = px - 520; } if (st.on) st.bx += 21; break;
+      case 'flybug': if (px > o.x - 900) st.t = (st.t || 0) + 1; break;
+      case 'gate': if (!R.ground && px > o.x - 420 && px < o.x) st.closed = true; break;
+      case 'pad': if (R.ground && px > o.x - 10 && px < o.x + o.w + 10) { R.vy = -48; R.ground = false; st.launch = true; } break;
+      case 'mirror':
+        if (R.justJumped && px > o.x - 600 && px < o.x - 40 && !st.y) { st.vy = 20; st.y = 0.01; }
+        if (st.y) { st.y += st.vy; st.vy -= GRAV; if (st.y <= 0) { st.y = 0; st.vy = 0; } } break;
+      case 'dropbug': if (st.fall) st.fall++; else if (px > o.x - 700) st.fall = 1; break;
+      case 'conveyor': if (R.ground && px > o.x && px < o.x + o.w) { if (R.off0 === undefined) R.off0 = R.off; R.off += 9; st.on = true; } break;
+      case 'popspike': if (px > o.x - 200) st.up = Math.min(60, (st.up || 0) + 20); break;
+      case 'movpit': if (px > o.x - 1500) st.t = (st.t || 0) + 1; break;
+    }
+  }
+  R.justJumped = false;
+  if (R.off0 !== undefined && R.ground && R.off > R.off0) { let on = false; for (let k = lo; k < hi; k++) { const o = obs[k]; if (o.k === 'conveyor' && px > o.x && px < o.x + o.w) on = true; } if (!on) R.off = Math.max(R.off0, R.off - 3); }
+  // 落地前：陷阱门
+  if (!R.ground && !R.fall && R.y >= GROUND) {
+    for (let k = lo; k < hi; k++) { const o = obs[k]; if (o.k === 'fakebug' && px > o.x + o.w && px < o.x + o.w + o.td) S_(R, k).open = true; }
+  }
+  // 洞
+  let hole = -1;
+  for (let k = lo; k < hi; k++) {
+    const o = obs[k], st = S_(R, k); let a = 0, b = 0;
+    if (o.k === 'pit' || o.k === 'hblock') { a = o.x; b = o.x + o.w; }
+    else if (o.k === 'crack' && st.broke) { a = o.x; b = o.x + o.w; }
+    else if (o.k === 'fakeland') { a = o.x; b = o.x + o.w + (st.broke ? o.w2 : 0); }
+    else if (o.k === 'widen') { a = o.x; b = o.x + o.w + (st.wide ? 200 : 0); }
+    else if (o.k === 'fakebug' && st.open) { a = o.x + o.w; b = o.x + o.w + o.td; }
+    else if (o.k === 'hidpit' || o.k === 'ceiling') { a = o.x; b = o.x + o.w; }
+    else if (o.k === 'conveyor') { a = o.x + o.w + 150; b = a + 170; }
+    else if (o.k === 'movpit') { a = o.x + movS(st); b = a + o.w; }
+    else continue;
+    if (px - 12 > a && px + 12 < b) hole = k;
+    if (o.k === 'crack' || o.k === 'fakeland') { if (px > a && px < b && st.broke) hole = k; }
+  }
+  if (!R.ground && R.y >= GROUND && hole < 0 && !R.fall) { R.y = GROUND; R.vy = 0; R.ground = true; }
+  if (R.ground && hole >= 0) { R.ground = false; R.fall = true; R.vy = Math.max(R.vy, 2); R.killer = hole; }
+  if (!R.ground && R.y > GROUND && hole >= 0) { R.fall = true; if (R.killer < 0) R.killer = hole; }
+  if (R.fall && R.y > GROUND + 140) { die2(R, W0, R.killer >= 0 ? obs[R.killer].k : 'pit', R.killer); return; }
+  // 碰撞
+  const x0 = px - BODY_W / 2, x1 = px + BODY_W / 2, yTop = R.y - BODY_H, yBot = R.y;
+  const hit = (a, b, c, d) => x1 > a && x0 < b && yBot > c && yTop < d;
+  for (let k = lo; k < hi; k++) {
+    const o = obs[k], st = S_(R, k);
+    switch (o.k) {
+      case 'block': if (hit(o.x, o.x + o.w, GROUND - o.h + 4, GROUND)) return die2(R, W0, 'block', k); break;
+      case 'sign': if (hit(o.x, o.x + o.w, 0, SIGN_BOTTOM - 2)) return die2(R, W0, 'sign', k); break;
+      case 'charger': { const cx = o.x + (st.dx || 0); if (hit(cx, cx + o.w, GROUND - 66, GROUND)) return die2(R, W0, 'charger', k); break; }
+      case 'hblock': if (hit(o.x - 60, o.x + o.w + 60, GROUND - 336, GROUND - 296) && yTop < GROUND - 296) { if (!st.hit) { st.hit = true; } if (R.vy < 4) { R.vy = 4; R.held = false; } R.killer = k; } break;
+      case 'paper': if (hit(o.x - 260, o.x + o.w + 260, 0, GROUND - 150)) return die2(R, W0, 'paper', k); break;
+      case 'mimic': if (hit(o.x, o.x + o.w, GROUND - 200, GROUND)) return die2(R, W0, 'mimic', k); break;
+      case 'crusher': if (hit(o.x, o.x + o.w, 0, crusherBottom(st))) return die2(R, W0, 'crusher', k); break;
+      case 'pad': if (st.launch && yTop < 60) return die2(R, W0, 'pad', k); break;
+      case 'backstab': if (st.on && hit(st.bx, st.bx + 60, GROUND - 60, GROUND)) return die2(R, W0, 'backstab', k); break;
+      case 'flybug': { const c = flyY(st); if (hit(o.x, o.x + o.w, c - 30, c + 30)) return die2(R, W0, 'flybug', k); break; }
+      case 'gate': if (st.closed && hit(o.x, o.x + o.w, 0, GROUND)) return die2(R, W0, 'gate', k); break;
+      case 'mirror': { const l = mirLift(st); if (hit(o.x, o.x + o.w, GROUND - o.h - l + 4, GROUND - l)) return die2(R, W0, 'mirror', k); break; }
+      case 'dropbug': { const l = dropLift(st); if (hit(o.x, o.x + o.w, GROUND - o.h - l + 4, GROUND - l)) return die2(R, W0, 'dropbug', k); break; }
+      case 'popspike': if (st.up && hit(o.x, o.x + o.w, GROUND - st.up, GROUND)) return die2(R, W0, 'popspike', k); break;
+      case 'ceiling': if (hit(o.x - 250, o.x + o.w + 250, 0, GROUND - 236)) return die2(R, W0, 'ceiling', k); break;
+    }
+  }
+  R.dist = px;
+}
+function die2(R, W0, kind, k) { if (k >= 0) S_(R, k).dead = true; R.alive = false; R.deathAt = W0 + R.off; R.deathY = R.y; R.how = HOW[kind]; R.kind = kind; R.killer = k; R.dist = W0 + R.off; }
+
+function nextObs2(R, obs, px, from) {
+  let i = from;
+  while (i < obs.length && extentEnd(obs[i], R.st[i] || {}) < px - BODY_W / 2) i++;
+  return i;
+}
+function sense2(R, W0, obs, idx) {
+  const px = W0 + R.off, inp = R.inp; inp.fill(0);
+  const i = nextObs2(R, obs, px, idx), o = obs[i], o2 = obs[i + 1];
+  if (o) {
+    const st = R.st[i] || {};
+    const ox = o.k === 'charger' ? o.x + (st.dx || 0) : o.x;
+    inp[0] = Math.max(-0.5, (ox - px) / 1000);
+    inp[1] = (extentEnd(o, st) - o.x) / 300;
+    inp[2] = (o.h || (o.k === 'charger' ? 66 : o.k === 'mimic' ? 200 : 0)) / 150;
+    inp[3 + KINDS.indexOf(o.k)] = o.k === 'ceiling' ? 4 : 1;   // 天花板：看得特别清楚（不然只会跳满）
+    const A = 26, B = 27;
+    if (o.k === 'crusher') { inp[A] = (GROUND - crusherBottom(st)) / 460; inp[B] = st.trig ? 1 : 0; }
+    if (o.k === 'flybug') { inp[A] = (GROUND - flyY(st)) / 300; inp[B] = Math.cos(2 * Math.PI * (st.t || 0) / 64); }
+    if (o.k === 'charger') inp[A] = st.dx ? 1 : 0;
+    if (o.k === 'widen' || o.k === 'gate') inp[A] = (st.wide || st.closed) ? 1 : 0;
+    if (o.k === 'mirror') { inp[A] = mirLift(st) / 160; inp[B] = (st.vy || 0) / 20; }
+    if (o.k === 'dropbug') inp[A] = dropLift(st) / 900;
+    if (o.k === 'conveyor') { inp[A] = (o.x + o.w + 150 - px) / 1000; inp[B] = R.off0 !== undefined ? (R.off - R.off0) / 200 : 0; }
+    if (o.k === 'popspike') inp[A] = (st.up || 0) / 60;
+    if (o.k === 'ceiling') { inp[A] = Math.max(0, (o.x + o.w + 250 - px)) / 600; inp[B] = 4 * Math.max(0, GROUND - R.y) / 140; }
+    if (o.k === 'movpit') { inp[A] = movS(st) / 200; inp[B] = Math.cos(2 * Math.PI * (st.t || 0) / 80); }
+  } else inp[0] = 3;
+  inp[28] = o2 ? (o2.x - px) / 1500 : 2;
+  inp[29] = 2;
+  for (let k = Math.max(0, idx - 3); k < Math.min(obs.length, idx + 3); k++) { const st = R.st[k]; if (obs[k].k === 'backstab' && st && st.on && st.bx < px) inp[29] = (px - st.bx - 60) / 600; }
+  inp[30] = HELL_SPEED / 22;
+  inp[31] = (GROUND - R.y) / 300;
+  inp[32] = R.vy / 26;
+  if (R.blind) blindView(inp, o);
+}
+// 旧大脑（新手村版）只看得懂：距离、宽度、高度、是不是坑、是不是验证码
+const LOOKS_PIT = ['pit', 'hblock', 'widen', 'fakeland', 'conveyor', 'movpit', 'ceiling'], LOOKS_SIGN = ['sign'], LOOKS_BLOCK = ['block', 'charger', 'fakebug', 'paper', 'mimic', 'mirror', 'dropbug'];
+function blindView(inp, o) {
+  const keep = new Set(MAP9);
+  for (let i = 0; i < NI2; i++) if (!keep.has(i)) inp[i] = 0;
+  if (!o) return;
+  inp[3] = LOOKS_PIT.includes(o.k) ? 1 : 0; inp[5] = LOOKS_SIGN.includes(o.k) ? 1 : 0;
+  if (!LOOKS_BLOCK.includes(o.k)) inp[2] = 0;
+}
+function think2(g, inp, hid, out) {
+  let p = 0;
+  for (let j = 0; j < NH2; j++) { let s = 0; for (let i = 0; i < NI2; i++) s += g[p++] * inp[i]; hid[j] = s; }
+  for (let j = 0; j < NH2; j++) hid[j] = Math.tanh(hid[j] + g[p++]);
+  if (think2.blind) for (let j = NH; j < NH2; j++) hid[j] = 0;
+  for (let k = 0; k < NO2; k++) { let s = 0; for (let j = 0; j < NH2; j++) s += g[p++] * hid[j]; out[k] = s; }
+  for (let k = 0; k < NO2; k++) out[k] += g[p++];
+  if (!think2.blind) for (let k = 0; k < NO2; k++) { let s = 0; for (let i = 0; i < NI2; i++) s += g[p++] * inp[i]; out[k] += s; }
+  for (let k = 0; k < NO2; k++) out[k] = 1 / (1 + Math.exp(-out[k]));
+}
+// 把新手村的 9-8-2 大脑搬进 26-12-2 的大脑（新增的部分先全是 0）
+const MAP9 = [0, 1, 2, 3, 5, 28, 30, 31, 32];
+function expandGenome(g) {
+  const n = new Float32Array(NPARAM2); let p = 0;
+  for (let j = 0; j < NH; j++) for (let i = 0; i < NI; i++) n[j * NI2 + MAP9[i]] = g[p++];
+  for (let j = 0; j < NH; j++) n[NH2 * NI2 + j] = g[p++];
+  for (let k = 0; k < NO; k++) for (let j = 0; j < NH; j++) n[NH2 * NI2 + NH2 + k * NH2 + j] = g[p++];
+  for (let k = 0; k < NO; k++) n[NH2 * NI2 + NH2 + NH2 * NO2 + k] = g[p++];
+  return n;
+}
+function evolve2(pop, r, boost = 1) {
+  const sorted = pop.slice().sort((a, b) => b.fit - a.fit);
+  const next = []; for (let i = 0; i < 6; i++) next.push(sorted[i].g);
+  const top = sorted.slice(0, 30);
+  const pick = () => { const a = top[Math.floor(r() * top.length)], b = top[Math.floor(r() * top.length)]; return a.fit > b.fit ? a : b; };
+  while (next.length < POP) {
+    const A = pick().g, B = pick().g, c = new Float32Array(NPARAM2);
+    const sig = [0.15, 0.5, 1.2][Math.floor(r() * 3)] * boost;
+    for (let k = 0; k < NPARAM2; k++) { c[k] = r() < 0.5 ? A[k] : B[k]; if (r() < 0.08) c[k] += gauss(r) * sig; }
+    next.push(c);
+  }
+  return next;
+}
+
+class HellSim {
+  constructor(opts) {
+    this.adaptive = !!opts.adaptive; this.blind = !!opts.blind; this.r = rng(opts.seed ?? 11); this.gen = opts.gen0 ?? 30; this.gen0 = this.gen; this.best = 0; this.history = []; this.hell = true;
+    const C2 = hellCourse(); this.obs = C2.obs; this.finish = C2.finish;
+    this.genomes = opts.genomes.map(g => g.length === NPARAM2 ? Float32Array.from(g) : expandGenome(g));
+    while (this.genomes.length < POP) this.genomes.push(this.genomes[this.genomes.length % opts.genomes.length]);
+    this.reset();
+  }
+  reset() {
+    const rr = rng(1000 + this.gen);
+    this.runners = this.genomes.map((g, i) => { const R = makeRunner2(i, g, rr); R.blind = !!this.blind; return R; });
+    this.W0 = 0; this.frame = 0; this.idx = 0; this.done = false; this.deaths = [];
+  }
+  alive() { let n = 0; for (const R of this.runners) if (R.alive) n++; return n; }
+  leader() { let b = null; for (const R of this.runners) if (R.alive && (!b || R.dist > b.dist)) b = R; return b; }
+  tick() {
+    if (this.done) return;
+    think2.blind = !!this.blind;
+    this.W0 += HELL_SPEED; this.frame++;
+    while (this.idx < this.obs.length && extentEnd(this.obs[this.idx], {}) + 900 < this.W0 - 200) this.idx++;
+    for (const R of this.runners) {
+      if (!R.alive) continue;
+      sense2(R, this.W0, this.obs, this.idx); think2(R.g, R.inp, R.hid, R.out);
+      const press = R.ground ? R.out[0] > 0.5 : R.out[1] > 0.5;
+      stepRunner2(R, this.W0, this.obs, this.idx, R.ground ? press : (press ? null : false));
+      if (R.alive && R.dist >= this.finish) { R.win = true; R.alive = false; R.deathAt = R.dist; }
+      if (!R.alive) this.deaths.push({ R, f: this.frame });
+    }
+    if (this.alive() === 0) this.finishGen();
+  }
+  finishGen() {
+    this.done = true;
+    for (const R of this.runners) R.fit = R.dist + (R.win ? 5000 : 0) - R.jumps * 2;
+    const top = Math.max(...this.runners.map(R => R.dist));
+    const wins = this.runners.filter(R => R.win).length;
+    this.best = Math.max(this.best, top);
+    const causes = {}; for (const R of this.runners) if (!R.win) causes[R.kind] = (causes[R.kind] || 0) + 1;
+    const far = this.runners.reduce((a, b) => a.dist > b.dist ? a : b);
+    this.history.push({ gen: this.gen, top, wins, causes, farKind: far.win ? 'WIN' : far.kind });
+  }
+  nextGen() {
+    const top = this.history.at(-1).top;
+    if (this.adaptive) { if (top > (this.bestSeen || 0) + 20) { this.bestSeen = top; this.stale = 0; this.boost = 1; } else if (++this.stale >= 12) { this.boost = Math.min(5, (this.boost || 1) * 1.5); this.stale = 6; } }
+    this.history.at(-1).boost = this.boost || 1;
+    this.genomes = evolve2(this.runners, this.r, this.adaptive ? (this.boost || 1) : 1); this.gen++; this.reset();
+  }
+  runGenFast() { while (!this.done) this.tick(); }
+}
+// ====== 地狱关：画陷阱（用“参考跑者”的世界状态） ======
+function drawHole(sx, w) { ctx.fillStyle = '#0b0606'; ctx.fillRect(sx, GROUND, w, H - GROUND); ctx.fillStyle = '#3a1a14'; ctx.fillRect(sx, GROUND - 1, w, 7); }
+function bugBody(x, y, w, h, col, t, opt = {}) {
+  ctx.save(); ctx.globalAlpha *= opt.alpha ?? 1;
+  ctx.fillStyle = col; roundRect(x, y, w, h, 10); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.min(26, w * 0.42)}px monospace`; ctx.textAlign = 'center'; ctx.fillText('BUG', x + w / 2, y + Math.min(32, h * 0.45));
+  if (opt.eyes) { ctx.fillStyle = '#fff'; for (const ex of [x + w * 0.3, x + w * 0.7]) { ctx.beginPath(); ctx.arc(ex, y + h * 0.66, 6, 0, 7); ctx.fill(); } ctx.fillStyle = '#111'; for (const ex of [x + w * 0.3, x + w * 0.7]) { ctx.beginPath(); ctx.arc(ex - 2, y + h * 0.66, 3, 0, 7); ctx.fill(); } }
+  if (opt.smirk) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + w * 0.3, y + h * 0.75); ctx.quadraticCurveTo(x + w * 0.6, y + h * 0.85, x + w * 0.78, y + h * 0.68); ctx.stroke(); }
+  if (opt.legs) { ctx.strokeStyle = '#7a1f1c'; ctx.lineWidth = 4; for (let l = 0; l < 3; l++) { const ph = Math.sin(t * 0.8 + l * 2) * 6; ctx.beginPath(); ctx.moveTo(x + 8 + l * (w - 16) / 2, y + h); ctx.lineTo(x + 8 + l * (w - 16) / 2 + ph, y + h + 8); ctx.stroke(); } }
+  if (opt.wings) { ctx.fillStyle = 'rgba(220,235,255,.75)'; const fl = Math.sin(t * 1.3) * 10; ctx.beginPath(); ctx.ellipse(x + w * 0.25, y - 6, 18, 8 + fl * 0.5, -0.5, 0, 7); ctx.ellipse(x + w * 0.75, y - 6, 18, 8 - fl * 0.5, 0.5, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+function cracks(sx, w, a) { ctx.strokeStyle = `rgba(20,10,6,${a})`; ctx.lineWidth = 2; ctx.beginPath(); for (let k = 0; k < w / 40; k++) { const x = sx + 14 + k * 40; ctx.moveTo(x, GROUND + 2); ctx.lineTo(x + 7, GROUND + 14); ctx.lineTo(x + 2, GROUND + 26); } ctx.stroke(); }
+function drawTrap(o, st, sx, t, ref) {
+  const pr = ref ? (ref.alive ? ref.dist : ref.deathAt) : 0;
+  switch (o.k) {
+    case 'pit': drawHole(sx, o.w); break;
+    case 'block': bugBody(sx, GROUND - o.h, o.w, o.h, C.bug, t, { legs: true }); break;
+    case 'sign':
+      ctx.strokeStyle = '#9c8a76'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sx + o.w / 2, 0); ctx.lineTo(sx + o.w / 2, SIGN_BOTTOM - 130); ctx.stroke();
+      ctx.fillStyle = C.sign; roundRect(sx, SIGN_BOTTOM - 130, o.w, 130, 12); ctx.fill(); ctx.fillStyle = '#10223a'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('请完成', sx + o.w / 2, SIGN_BOTTOM - 82); ctx.fillText('验证', sx + o.w / 2, SIGN_BOTTOM - 52); break;
+    case 'crack': if (st.broke) drawHole(sx, o.w); else cracks(sx, o.w, 0.35); break;
+    case 'fakeland': drawHole(sx, o.w); if (st.broke) drawHole(sx + o.w, o.w2); else cracks(sx + o.w, o.w2, 0.3); break;
+    case 'hblock':
+      drawHole(sx, o.w);
+      if (st.hit) { ctx.fillStyle = '#8a8f99'; roundRect(sx - 60, GROUND - 336, o.w + 120, 40, 8); ctx.fill(); ctx.fillStyle = '#20242c'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('隐形砖 ( ˘▽˘)', sx + o.w / 2, GROUND - 308); }
+      else { const a = 0.18 + 0.18 * Math.max(0, Math.sin(t * 0.09)); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('✦', sx + o.w / 2 + 20, GROUND - 310); }
+      break;
+    case 'charger': bugBody(sx + (st.dx || 0), GROUND - 66, o.w, 66, '#e0603a', t, { eyes: true, legs: true }); break;
+    case 'paper': {
+      ctx.save(); ctx.globalAlpha = 0.86 + 0.1 * Math.sin(t * 0.7);
+      ctx.fillStyle = '#c0282d'; ctx.fillRect(sx, GROUND - 320, o.w, 320);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 30px monospace'; ctx.textAlign = 'center'; 'ERROR'.split('').forEach((c, i) => ctx.fillText(c, sx + o.w / 2, GROUND - 270 + i * 44));
+      ctx.restore();
+      if (st.dead) { ctx.fillStyle = '#ddd'; for (let k = 0; k < (o.w + 520) / 24; k++) { const x = sx - 260 + k * 24; ctx.beginPath(); ctx.moveTo(x, GROUND - 150); ctx.lineTo(x + 12, GROUND - 175); ctx.lineTo(x + 24, GROUND - 150); ctx.fill(); } }
+      break;
+    }
+    case 'mimic': {
+      for (let r = 0; r < 10; r++) for (let c = 0; c < 2; c++) { ctx.fillStyle = (r + c) % 2 ? '#fff' : '#222'; ctx.fillRect(sx + c * 20, GROUND - 200 + r * 20, 20, 20); }
+      ctx.fillStyle = '#fff6ea'; ctx.font = 'bold 30px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText('终点', sx + 52, GROUND - 170); ctx.fillStyle = '#ffd34d'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.fillText('恭喜通关！', sx + 52, GROUND - 138);
+      if ((t % 150) < 6 || st.dead) { ctx.fillStyle = '#c00'; ctx.beginPath(); ctx.arc(sx + 20, GROUND - 120, 7, 0, 7); ctx.fill(); }
+      if (st.dead) { ctx.fillStyle = '#fff'; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(sx + k * 8, GROUND - 80); ctx.lineTo(sx + 4 + k * 8, GROUND - 66); ctx.lineTo(sx + 8 + k * 8, GROUND - 80); ctx.fill(); } }
+      break;
+    }
+    case 'crusher': {
+      const b = crusherBottom(st);
+      ctx.fillStyle = '#4d4f57'; ctx.fillRect(sx, 0, o.w, b); ctx.fillStyle = '#2b2c31'; ctx.fillRect(sx, b - 26, o.w, 26);
+      ctx.fillStyle = '#ff6b5b'; ctx.font = 'bold 34px monospace'; ctx.textAlign = 'center'; ctx.fillText('404', sx + o.w / 2, b - 80);
+      const look = Math.max(-6, Math.min(6, (pr - o.x) / 60));
+      ctx.fillStyle = '#fff'; for (const ex of [sx + 38, sx + 82]) { ctx.beginPath(); ctx.arc(ex, b - 48, 10, 0, 7); ctx.fill(); }
+      ctx.fillStyle = '#111'; for (const ex of [sx + 38, sx + 82]) { ctx.beginPath(); ctx.arc(ex + look, b - 48, 5, 0, 7); ctx.fill(); }
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(sx + 26, b - 66); ctx.lineTo(sx + 50, b - 60); ctx.moveTo(sx + 94, b - 66); ctx.lineTo(sx + 70, b - 60); ctx.stroke();
+      break;
+    }
+    case 'pad':
+      ctx.fillStyle = '#3fb86b'; roundRect(sx, GROUND - 14, o.w, 14, 5); ctx.fill();
+      ctx.fillStyle = '#7dffa8'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('↑ 加速！', sx + o.w / 2, GROUND - 26);
+      ctx.fillStyle = st.launch ? '#ddd' : 'rgba(221,221,221,.06)'; for (let k = 0; k < 8; k++) { const x = sx - 60 + k * 26; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 13, 40); ctx.lineTo(x + 26, 0); ctx.fill(); }
+      break;
+    case 'backstab':
+      if (!st.on) { ctx.fillStyle = '#9b7a52'; ctx.fillRect(sx, GROUND - 40, 50, 40); ctx.strokeStyle = '#6d5236'; ctx.lineWidth = 2; ctx.strokeRect(sx, GROUND - 40, 50, 40); ctx.fillStyle = '#111'; ctx.fillRect(sx + 14, GROUND - 28, 6, 3); ctx.fillRect(sx + 30, GROUND - 28, 6, 3); }
+      else { ctx.fillStyle = '#9b7a52'; ctx.beginPath(); ctx.moveTo(sx, GROUND); ctx.lineTo(sx + 6, GROUND - 14); ctx.lineTo(sx + 50, GROUND - 10); ctx.lineTo(sx + 50, GROUND); ctx.fill(); }
+      break;
+    case 'fakebug': bugBody(sx, GROUND - o.h, o.w, o.h, C.bug, t, { smirk: true, alpha: 0.9, legs: true }); if (st.open) drawHole(sx + o.w, o.td); else { ctx.strokeStyle = 'rgba(20,10,6,.25)'; ctx.lineWidth = 2; ctx.strokeRect(sx + o.w + 4, GROUND + 3, o.td - 8, 18); } break;
+    case 'widen': drawHole(sx, o.w + (st.wide ? 200 : 0)); if (!st.wide) { ctx.fillStyle = 'rgba(20,10,6,.35)'; ctx.fillRect(sx + o.w, GROUND + 6, 30, 4); } break;
+    case 'flybug': { const c = flyY(st); bugBody(sx, c - 30, o.w, 60, '#b85cd6', t, { wings: true, eyes: true }); break; }
+    case 'hidpit':
+      if (st.dead) drawHole(sx, o.w);
+      else {   // 破绽：地面颜色淡一点、两边有细缝、上方有一颗会闪的小亮点
+        ctx.fillStyle = 'rgba(255,225,190,.10)'; ctx.fillRect(sx, GROUND + 6, o.w, H - GROUND - 6);
+        ctx.fillStyle = 'rgba(20,10,6,.55)'; ctx.fillRect(sx - 1, GROUND + 2, 3, 30); ctx.fillRect(sx + o.w - 2, GROUND + 2, 3, 30);
+        ctx.strokeStyle = 'rgba(255,225,190,.28)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx + 4, GROUND + 3); ctx.lineTo(sx + o.w - 4, GROUND + 3); ctx.stroke(); ctx.setLineDash([]);
+        const a = 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.15)); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('✧', sx + o.w / 2, GROUND - 16);
+      }
+      break;
+    case 'mirror': {
+      const l = mirLift(st), y = GROUND - o.h - l;
+      bugBody(sx, y, o.w, o.h, '#e07ab0', t, { eyes: true, smirk: true });
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 3; ctx.beginPath(); for (let z = 0; z <= 6; z++) ctx.lineTo(sx + o.w / 2 + (z % 2 ? 9 : -9), GROUND - l + (z / 6) * Math.max(8, l)); ctx.stroke();
+      break;
+    }
+    case 'dropbug': {
+      const l = dropLift(st), k = 1 - l / 900;
+      ctx.fillStyle = `rgba(0,0,0,${0.15 + 0.35 * k})`; ctx.beginPath(); ctx.ellipse(sx + o.w / 2, GROUND + 4, o.w * (0.35 + 0.5 * k), 7, 0, 0, 7); ctx.fill();
+      if (l < 900) bugBody(sx, GROUND - o.h - l, o.w, o.h, '#d9534f', t, { eyes: true, legs: l === 0 });
+      break;
+    }
+    case 'conveyor': {
+      ctx.fillStyle = '#55504a'; ctx.fillRect(sx, GROUND - 4, o.w, 14);
+      ctx.fillStyle = '#ffcf5a'; ctx.font = 'bold 20px monospace'; ctx.textAlign = 'left';
+      for (let x = (t * 6) % 40; x < o.w - 20; x += 40) ctx.fillText('»', sx + x, GROUND + 9);
+      drawHole(sx + o.w + 150, 170);
+      break;
+    }
+    case 'popspike':
+      if (st.up) { ctx.fillStyle = '#ddd'; for (let k = 0; k < o.w / 20; k++) { const x = sx + k * 20; ctx.beginPath(); ctx.moveTo(x, GROUND); ctx.lineTo(x + 10, GROUND - st.up); ctx.lineTo(x + 20, GROUND); ctx.fill(); } }
+      else { ctx.fillStyle = 'rgba(10,5,3,.45)'; for (let k = 0; k < o.w / 20; k++) { ctx.beginPath(); ctx.arc(sx + 10 + k * 20, GROUND + 3, 2.5, 0, 7); ctx.fill(); } }
+      break;
+    case 'movpit': {
+      const m = movS(st); drawHole(sx + m, o.w);
+      ctx.fillStyle = 'rgba(255,207,90,.35)'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⇠  ⇢', sx + m + o.w / 2, GROUND + 60);
+      break;
+    }
+    case 'ceiling': {
+      const x0 = sx - 250, w = o.w + 500;
+      ctx.fillStyle = '#3b3540'; ctx.fillRect(x0, 0, w, GROUND - 260);
+      ctx.fillStyle = '#ddd'; for (let k = 0; k < w / 24; k++) { const x = x0 + k * 24; ctx.beginPath(); ctx.moveTo(x, GROUND - 260); ctx.lineTo(x + 12, GROUND - 236); ctx.lineTo(x + 24, GROUND - 260); ctx.fill(); }
+      drawHole(sx, o.w);
+      break;
+    }
+    case 'gate': {
+      ctx.fillStyle = '#5b3a2a'; ctx.fillRect(sx - 40, GROUND - 330, 40, 330); ctx.fillRect(sx + o.w, GROUND - 330, 40, 330); ctx.fillRect(sx - 40, GROUND - 360, o.w + 80, 34);
+      ctx.fillStyle = '#e8e2d6'; ctx.font = '30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('💀', sx + o.w / 2, GROUND - 334);
+      if (st.closed) { ctx.fillStyle = '#9aa0a8'; for (let k = 0; k < 4; k++) ctx.fillRect(sx + 4 + k * 12, GROUND - 326, 6, 326); }
+      else { ctx.fillStyle = '#9aa0a8'; for (let k = 0; k < 4; k++) ctx.fillRect(sx + 4 + k * 12, GROUND - 326, 6, 40); }
+      break;
+    }
+  }
+}
+//@@HELL_END
+window.API = { HellSim, hellCourse, KINDS, TAUNT, HOW, TRAP_NAME, makeRunner2, stepRunner2, sense2, think2, expandGenome, crusherBottom, flyY, extentEnd, CHAMPION, Sim, makeCourse, drawWorld, drawHUD, drawGirl, drawBrain, state, ctx, W, H, FINISH, PX_PER_M, POP, speedAt, makeRunner, sense, think, stepRunner, rng };
 window.REC_MODE = location.hash.includes('record');
 if (window.REC_MODE) document.body.classList.add('rec');
-newTrain();
-if (!window.REC_MODE) loop();
+if (location.hash.includes('clip')) { window.REC_MODE = true; document.body.classList.add('clip'); syncUI(); newPlay(false); window.CLIP = { loop, down, up }; }
+else if (!window.REC_MODE) { syncUI(); newPlay(false); loop(); }
 </script>
 </body>
 </html>
