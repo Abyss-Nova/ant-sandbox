@@ -49,6 +49,11 @@
   <button class="trainonly" data-spd="20">20×</button>
   <button class="trainonly" id="course">地图：固定</button>
   <button class="trainonly on" id="brainbtn">显示大脑</button>
+  <span class="sep trainonly"></span>
+  <span class="trainonly">跳到第</span>
+  <input class="trainonly" id="gen" type="number" min="1" max="999" style="width:64px;background:#2c251d;color:#f6eee3;border:1px solid #6b5640;border-radius:8px;padding:6px;font:inherit">
+  <button class="trainonly" id="go">代</button>
+  <span class="trainonly" id="presets" style="display:flex;gap:6px"></span>
 </div>
 <script>
 'use strict';
@@ -395,8 +400,34 @@ function deaths(level, add) { let n = 0; try { n = +(localStorage.getItem('jump-
 let G30 = null;
 function gen30() { if (G30) return G30; const s = new Sim({ seed: 7 }); for (let g = 1; g < 30; g++) { s.runGenFast(); s.nextGen(); } s.runGenFast(); G30 = s.genomes; return G30; }
 function newTrain() {
-  state.announced = false;
-  state.sim = state.level === 'hell' ? new HellSim({ seed: 12, genomes: gen30(), gen0: 30 }) : new Sim({ fixed: state.fixed !== false });
+  state.announced = false; state.jumping = null;
+  // 地狱关和视频一样：第30~69代用旧大脑，第70代换新大脑
+  state.sim = state.level === 'hell' ? new HellSim({ seed: 11, genomes: gen30(), gen0: 30, blind: true }) : new Sim({ fixed: state.fixed !== false });
+  syncJump();
+}
+function advance(s) {
+  if (s.hell && s.blind && s.gen >= 69) { state.sim = new HellSim({ seed: 12, genomes: s.genomes, gen0: 70 }); msg('第70代：换新大脑！', 2500); return state.sim; }
+  s.nextGen(); return s;
+}
+// 跳到第 N 代：分批快速计算，不卡画面
+function jumpTo(n) {
+  const min = state.level === 'hell' ? 30 : 1;
+  n = Math.max(min, Math.min(999, Math.round(n) || min));
+  if (n < state.sim.gen || (n === state.sim.gen && state.sim.frame > 0)) newTrain();
+  state.jumping = n; state.announced = true;
+}
+function jumpStep() {
+  const t0 = performance.now();
+  let s = state.sim;
+  while (s.gen < state.jumping && performance.now() - t0 < 30) { s.runGenFast(); s = advance(s); }
+  if (s.gen >= state.jumping) { state.jumping = null; msg(`第 ${s.gen} 代`, 1500); }
+  else msg(`计算中…… 第 ${s.gen} / ${state.jumping} 代`, 0);
+}
+function syncJump() {
+  const box = document.getElementById('presets'); if (!box) return;
+  const P = state.level === 'hell' ? [[30, '30 进地狱'], [70, '70 换大脑'], [120, '120 被门挡'], [224, '224 首次通关'], [260, '260']] : [[1, '1'], [10, '10 首次通关'], [30, '30']];
+  box.innerHTML = P.map(([g, t]) => `<button data-g="${g}">${t}</button>`).join('');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => { jumpTo(+b.dataset.g); b.blur(); });
 }
 function newPlay(withAI) {
   hideTaunt();
@@ -426,8 +457,9 @@ function hideTaunt() { document.getElementById('taunt').classList.remove('on'); 
 function loop() {
   if (state.mode === 'train') {
     const s = state.sim;
-    for (let k = 0; k < state.spd; k++) { if (s.done) { const h = s.history[s.history.length - 1]; if (h.wins && !state.announced) { state.announced = true; msg(`第 ${s.gen} 代有 ${h.wins} 个到达终点！`, 3000); } s.nextGen(); } s.tick(); }
-    drawWorld(s, state.view); drawHUD(s, state.view);
+    if (state.jumping) jumpStep();
+    else for (let k = 0; k < state.spd; k++) { let s2 = state.sim; if (s2.done) { const h = s2.history[s2.history.length - 1]; if (h.wins && !state.announced) { state.announced = true; msg(`第 ${s2.gen} 代有 ${h.wins} 个到达终点！`, 3000); } s2 = advance(s2); } s2.tick(); }
+    drawWorld(state.sim, state.view); drawHUD(state.sim, state.view);
   } else {
     const s = state.humanSim, R = state.human, hell = !!s.hell;
     const now = performance.now(); const dt = Math.min(0.1, (now - (state.lastT || now)) / 1000); state.lastT = now;
@@ -476,13 +508,15 @@ function syncUI() {
   document.querySelector('[data-mode=race]').textContent = state.level === 'hell' ? '挑战第260代' : '挑战第30代';
   document.querySelectorAll('.trainonly').forEach(x => x.style.display = state.mode === 'train' ? '' : 'none');
   document.querySelectorAll('.playonly').forEach(x => x.style.display = state.mode === 'train' ? 'none' : '');
-  if (state.level === 'hell') document.getElementById('course').style.display = 'none';
+  if (state.level === 'hell') { document.getElementById('course').style.display = 'none'; document.getElementById('brainbtn').style.display = 'none'; }
 }
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; syncUI(); restart(); b.blur(); });
 document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { state.level = b.dataset.level; syncUI(); restart(); b.blur(); });
 document.querySelectorAll('[data-pspd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-pspd]').forEach(x => x.classList.toggle('on', x === b)); const v = +b.dataset.pspd; if (v !== state.pspd) { msg(pick(v < state.pspd ? SLOWER : FASTER), 0); clearTimeout(state.spdT); state.spdT = setTimeout(() => { if (state.mode === 'train' || state.started) msg('', 1); else msg('按空格／点屏幕开始，按住跳得更高', 0); }, 2200); } state.pspd = v; b.blur(); });
 document.querySelectorAll('[data-spd]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b)); state.spd = +b.dataset.spd; b.blur(); });
 document.getElementById('course').onclick = e => { state.fixed = state.fixed === false; e.target.textContent = '地图：' + (state.fixed === false ? '随机' : '固定'); restart(); e.target.blur(); };
+document.getElementById('go').onclick = e => { jumpTo(+document.getElementById('gen').value); e.target.blur(); };
+document.getElementById('gen').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { jumpTo(+e.target.value); e.target.blur(); } });
 document.getElementById('brainbtn').onclick = e => { state.view.brain = !state.view.brain; e.target.classList.toggle('on', state.view.brain); e.target.blur(); };
 //@@HELL_START
 // ====== 第二关：地狱 ======
