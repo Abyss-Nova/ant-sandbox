@@ -16,7 +16,7 @@
   #msg{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);font-size:min(4vw,42px);font-weight:800;text-align:center;pointer-events:none;text-shadow:0 3px 0 #000a}
   .rec #ui{display:none}
   #msg{white-space:pre-line}
-  #taunt{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);display:none;text-align:center;background:rgba(18,10,8,.92);border:3px solid #e8833a;border-radius:20px;padding:22px 34px;max-width:86vw;box-shadow:0 10px 40px #000a}
+  #taunt{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%);display:none;text-align:center;background:rgba(18,10,8,.92);border:3px solid #e8833a;border-radius:20px;padding:22px 34px;max-width:86vw;box-shadow:0 10px 40px #000a}
   #taunt.on{display:block;animation:pop .25s ease-out}
   @keyframes pop{from{scale:.6;opacity:0}to{scale:1;opacity:1}}
   #taunt .t1{font-size:min(6vw,52px);font-weight:900;color:#ffd34d}
@@ -24,6 +24,7 @@
   #taunt .t3{margin-top:6px;font-size:min(3vw,20px);color:#ffb46b}
   #taunt .t4{margin-top:14px;font-size:min(2.8vw,18px);color:#9c8a76}
   .rec #taunt{display:none!important}
+  .clip #taunt,.clip #msg{display:none!important}
 </style>
 </head>
 <body>
@@ -36,7 +37,7 @@
   <button id="lock" title="暂不开放">地狱关 🔒</button>
   <span class="sep"></span>
   <button data-mode="play" class="on">我自己玩</button>
-  <button data-mode="race">挑战第260代</button>
+  <button data-mode="race">挑战第310代</button>
   <button data-mode="train">看AI进化</button>
   <span class="sep playonly"></span>
   <span class="playonly">速度</span>
@@ -308,7 +309,7 @@ function drawWorld(sim, view) {
   if (sim.hell) {
     const ref = view.human || sim.leader() || view.lastLead || sim.runners.reduce((a, b) => a.dist > b.dist ? a : b, sim.runners[0]);
     for (let k = Math.max(0, sim.idx - 3); k < Math.min(sim.obs.length, sim.idx + 7); k++) {
-      const o = sim.obs[k], sx = o.x - cam; if (sx > W + 300 || extentEnd(o, {}) - cam < -300) continue;
+      const o = sim.obs[k], sx = o.x - cam; if (sx > W + 300 || extentEnd(o, {}) - cam < -300 || (view.maxX && o.x > view.maxX)) continue;
       drawTrap(o, (ref && ref.st && ref.st[k]) || {}, sx, sim.frame, ref);
     }
   }
@@ -392,7 +393,7 @@ function drawBrain(R, x, y, w, h) {
 const CHAMPION = [1.9186, -0.4169, 0.9499, -0.1508, 0.0445, -0.9796, -0.0298, 1.4838, 0.7827, -1.8202, -1.573, -0.0909, -1.3658, -1.3883, -0.1289, -0.6757, 0.3427, 1.1116, 2.7711, 0.5912, -0.6194, 0.8641, 0.1911, -0.7464, -1.1732, 0.2041, 1.3466, -2.1662, 0.6241, -1.1579, 0.5618, -0.4152, 1.966, 2.8249, -0.2182, -0.753, 2.6904, 1.3057, -0.4335, -1.0841, -0.7806, 0.032, 0.7737, -1.3941, -1.5663, 0.8349, -0.3672, 0.2488, -0.9571, -0.6485, -1.907, -1.0924, 1.0211, 0.5721, -1.3689, -0.0324, 0.2332, 2.0352, -0.6309, -0.6098, -1.1431, -0.5618, -1.4459, 3.2827, 1.6398, -0.4931, -1.6919, 0.7485, 0.4229, -0.955, 0.4305, 0.6454, -0.5808, 0.984, 0.4817, -0.2583, -0.084, -3.879, 0.053, -0.0283, -0.6396, 0.6566, -0.9973, -0.5696, -0.0017, -0.0188, 0.4349, -1.8375, -0.2649, -1.0819, -1.9435, 2.0007, -0.1476, -0.8179, -0.0707, -0.2918, 0.4846, 0.8828];
 
 // ====== 介面 ======
-const HELL_CHAMP = [1.9819, -0.1772, 3.2039, 0.8953, -0.6044, -1.7348, 0.3809, 0.3717, 0.2298, 0.4296, 0.274, -0.3155, 0.0313, -1.2903, -3.6169, 1.2416, -1.8496, -0.976, -3.4384, 0.1943, 0.4082, 0.1464, -2.4452, -2.2293, 0.7353, -0.4628, -0.6837, 0.7739, -1.4551, -1.5669, -1.6906, -1.491, -0.8512, 0.2155, 0.3235, -2.1255, -3.4089, 0.9866, 0.5767, -3.8116, -2.7147, 0.4395, 1.919, -0.473, 2.0548, 0.6757, -1.5531, 1.2519, -0.0796, -3.1207, -2.1169, 3.3102, 2.3466, 2.5259, -4.047, 0.2813, -0.6862, 1.5174, -0.9988, -0.4019, -0.8397, -0.1114, 2.1154, 4.1409, -0.8679, -1.0264, 0.8205, -1.3896, -0.8349, 0.2212, -3.0343, -0.5845, 0.4439, -2.4669, -0.4158, 0.0959, 2.7359, 1.6025, -1.5486, 1.4306, -1.5093, 1.2393, 0.7161, -0.8661, 0.1855, 1.5799, 0.4553, -0.0154, -1.0878, 1.0123, -0.9848, 0.9318, 0.87, -1.3793, -0.0026, 2.1798, 4.21, 2.0803, 0.2602, 1.9052, -1.2375, 3.7058, -3.4057, -0.5904, -0.6564, 4.1026, 0.5994, 0.4216, -1.9168, -1.7685, 0.658, -0.0766, 1.8933, -0.6235, -0.4744, 0.3751, 1.4705, -1.6844, 0.9099, 1.1101, -0.6825, -1.0018, -0.4032, 1.2878, -3.2949, -4.7704, 1.4604, 2.0613, -1.6935, -2.6903, -1.6021, 0.355, -0.1214, 0.0164, 1.2172, -3.3536, -0.4748, 0.3444, 2.013, 0.5669, 2.4331, 1.4763, 0.0631, -0.0013, 0.4288, 3.529, -1.4819, 0.5922, 1.3743, -0.2807, 3.332, -0.4891, -2.667, -2.631, 2.9822, -0.6518, -3.6058, -0.5031, 0.8097, 1.8352, -0.972, -0.8893, -1.0532, -1.5674, 1.3763, -2.0232, 1.1521, -2.4604, -2.3795, 1.0783, -0.8729, 0.6001, 1.5476, 0.498, 1.0318, -2.0273, -0.0592, -3.6849, 0.499, 2.2398, -0.6018, 3.094, 5.2885, 1.9329, -2.6231, -0.0916, 1.1817, 0.4434, -0.0722, 0.6033, 0.5179, -0.687, 0.1628, 1.1034, -0.9466, -0.103, -0.9258, -1.9888, -0.451, 1.6819, -1.0898, -0.3138, -0.5179, 0.5281, -0.0486, -1.0189, -1.6888, -0.7675, 1.0878, 1.3971, 2.0046, 0.0912, 0.159, -1.5371, -0.7918, 0.3537, -0.2784, 3.0216, 4.6511, -0.2414, -1.2937, -1.9491, -1.3242, -1.3387, -0.6847, 0.0321, 2.2813, 1.6201, -2.067, -0.1044, -1.3335, -1.4195, 1.3028, 0.2369, -0.4646, -1.5029, 0.814, -0.2238, 0.3263, 1.4048, 1.0812, 2.213, 0.8077, 1.1597, 0.0302, -1.1016, 1.2722, 0.5001, 2.6252, 1.1059, -4.8776, 0.9387, -0.1371, -5.8469, -1.7193, -2.3625, -0.9617, 0.3327, -0.6896, -0.3119, 0.281, 1.307, 0.0569, -0.923, -0.7419, 3.8479, -2.3074, -1.1726, -1.9527, -0.5688, 0.2602, -0.8062, 0.1066, 1.6118, -2.0396, -0.7883, -1.0947, 1.4946, 2.5211, 2.3892, -2.5879, 0.6286, -0.1091, -1.4399, -0.6608, -2.8176, -1.1038, 2.3182, 0.4644, 1.0708, -0.0559, -0.5809, 3.2527, 0.9568, -3.0745, 2.9749, 0.1499, 0.7558, -1.3417, 0.8825, -1.469, -0.7034, -1.3665, -3.5562, 0.8488, 0.699, 0.59, 0.9121, 0.9551, -1.6422, -1.5674, 2.0958, -0.1405, 0.7293, 0.2387, 1.5988, 0.2931, -3.6484, 2.0302, -0.7147, -0.8178, -0.0626, 0.7179, 0.1539, -0.4122, 1.7091, -2.8657, -0.2629, -1.3139, -0.4769, 1.2001, -1.8084, 0.3094, -0.5595, -0.9161, 0.5102, 2.1295, 0.0078, -0.5846, 3.1407, 2.338, -1.3795, -2.7178, -3.1838, -1.7024, 0.5805, 1.9997, -1.3742, 0.1212, 3.5375, -2.1891, 1.4835, 0.4181, 2.4911, 0.8852, 0.3956, 1.477, 1.2217, 2.0825, -2.8984, -0.2447, 0.7372, -0.373, 2.0432, -0.0619, -1.9969, -0.5586, 1.22, 1.3818, 1.2147, 0.3757, -0.2414, -1.2281, -2.1299, -0.9995, 0.914, -0.5945, 1.8307, 0.1155, 1.9648, -0.0992, 0.0067, 2.3079, 0.1445, 0.439, 1.241, 2.5826, -0.6117, -0.7022, -0.9661, 1.3388, -1.3934, 1.6649, 0.2657, 1.0476, -3.089, -1.1235, -0.6162, -0.2222, 0.5203, -0.6225, -0.2208];
+const HELL_CHAMP = [2.0957,  0.9927,  2.6993,  -0.1101,  -5.0123,  2.672,  -0.7228,  -2.0842,  1.3213,  6.9132,  0.589,  -4.5377,  -1.9839,  2.6377,  -0.6667,  1.3197,  -1.6085,  0.5662,  0.5711,  0.4063,  -0.9062,  -0.534,  -0.9012,  0.4749,  2.5757,  3.0373,  1.836,  -0.5839,  -0.0996,  -0.7893,  -0.598,  1.609,  2.0517,  0.3253,  -3.4122,  -1.8486,  -1.755,  -1.199,  -1.8127,  3.0314,  -1.9084,  0.604,  0.2946,  -4.079,  2.8657,  -0.0829,  0.1236,  0.2365,  -1.1417,  -1.4595,  2.3681,  0.4377,  0.9272,  -1.1632,  0.9575,  -0.9598,  1.6476,  -0.7091,  -1.5507,  -3.9026,  -1.2142,  0.6376,  -0.9997,  -1.0971,  2.6159,  0.4003,  3.3934,  -0.2307,  -2.6921,  1.7204,  1.7384,  -0.251,  -1.0627,  -2.8033,  -4.9696,  1.1865,  0.1299,  1.6507,  0.2674,  0.7851,  -0.3221,  -1.2716,  1.27,  -1.5083,  -5.5465,  -1.9756,  0.4383,  -0.4299,  -1.8192,  -3.0801,  -1.0122,  0.0691,  -0.3039,  -1.364,  -0.2021,  1.8009,  -2.9828,  1.3096,  3.6194,  -3.7933,  0.9787,  -0.5912,  1.4832,  0.6747,  0.0953,  -2.0177,  -0.9874,  -1.1222,  3.289,  -4.5863,  0.3984,  1.2585,  -2.0334,  -1.261,  1.0135,  1.3563,  -0.4825,  -4.7664,  -0.0384,  -1.5797,  -0.0964,  -1.6851,  -0.8667,  1.4638,  -1.8681,  4.3297,  -0.9197,  -0.2885,  3.9015,  6.4077,  -1.0734,  0.1237,  4.0381,  -1.066,  -0.3033,  -0.6455,  -0.1795,  -2.1355,  1.0678,  2.2961,  -0.2768,  0.9264,  -1.4141,  2.9906,  3.52,  -1.3797,  -2.0541,  4.6,  0.0674,  3.5047,  -1.2694,  1.1533,  -1.9699,  -0.8812,  -2.4809,  0.3299,  2.0022,  1.2586,  1.9674,  2.5234,  -0.614,  -0.1752,  0.0169,  -2.6727,  -0.6818,  -8.1058,  -3.2337,  2.4658,  0.8791,  0.3465,  -1.4901,  -0.6116,  1.7009,  -2.9593,  0.1959,  0.1542,  -0.9455,  -3.679,  -1.5234,  0.764,  0.4829,  0.7699,  -2.2541,  -1.9183,  0.3499,  -0.0362,  1.0617,  -2.787,  -3.7618,  -3.716,  0.7602,  1.9085,  0.6559,  1.1714,  -3.3644,  1.073,  -0.096,  -0.9569,  -0.5048,  2.4428,  3.0155,  2.1314,  -1.298,  0.3237,  0.7741,  -0.7227,  -1.4496,  -0.2532,  1.0331,  1.0165,  0.6946,  -0.4174,  0.2097,  -0.4315,  -1.2156,  2.6479,  -1.9018,  -3.0506,  1.6979,  -0.7238,  -2.9435,  -2.3767,  -4.8837,  -3.5218,  -3.3787,  -0.7892,  1.3434,  -0.4031,  0.1144,  -1.4382,  -2.3974,  4.1511,  3.0632,  0.1688,  -0.2314,  0.2651,  2.702,  0.242,  0.6381,  -0.9729,  2.5785,  0.0348,  4.6545,  -0.7126,  -0.3878,  -1.2483,  0.0575,  -0.6184,  2.7638,  -0.0554,  -1.3799,  -2.0801,  -0.6873,  -0.941,  0.3847,  -0.5096,  -1.3889,  -0.5612,  2.4149,  -0.2011,  -1.1924,  0.3778,  0.8063,  1.8013,  -2.5756,  -1.2348,  -2.7398,  3.3906,  1.8285,  -1.0618,  -1.1264,  2.9831,  0.3898,  -2.2275,  -1.3,  -0.5302,  -1.1486,  -2.6985,  -0.6432,  -0.5252,  -0.5597,  -2.3248,  -0.0135,  1.9268,  -0.5577,  0.8309,  2.0239,  2.7477,  0.5269,  3.8823,  0.2352,  -1.5057,  0.1494,  1.0022,  0.4546,  1.0741,  1.9944,  3.3143,  -0.0445,  1.4175,  4.1587,  0.391,  -2.879,  -1.9459,  0.1659,  -0.5284,  3.7766,  -0.396,  -1.2899,  2.3345,  -0.998,  0.6684,  -2.5167,  -1.1863,  0.1242,  -5.1651,  -0.196,  -0.8307,  -0.2315,  -0.9319,  0.3224,  0.2434,  -0.9987,  0.2316,  -1.9282,  0.4465,  1.3683,  2.4665,  -0.0878,  0.2329,  -0.6142,  -0.7691,  1.1149,  -1.7127,  -0.3203,  -2.9539,  -1.1758,  -2.4559,  0.3114,  -2.6528,  4.1033,  -0.8809,  2.5713,  -1.9315,  0.1823,  3.0755,  -1.4596,  1.8974,  0.6173,  3.9716,  -2.1258,  -0.1943,  -1.4764,  1.2718,  1.8219,  1.3116,  -0.2895,  -1.5659,  1.3141,  -0.4967,  -0.4362,  1.5971,  -1.1646,  -1.5608,  2.4543,  -2.7628,  -1.4421,  -0.3752,  0.2519,  1.3093,  -1.172,  -0.9961,  1.5112,  -1.7507,  1.7385,  1.6167,  0.3576,  0.4725,  0.9174,  2.8331,  -0.7774,  1.7489,  0.103,  -2.2108,  0.6639,  0.9861,  -2.2347,  -0.1026,  -1.1151,  0.5692,  0.8201,  -0.3091,  2.1502,  2.057,  1.9445,  1.1877,  -2.8288,  -1.6455,  -1.553,  -4.0683,  0.6982,  -2.5775,  1.9191,  -0.3159,  -1.3005,  -0.6977,  1.5449,  -0.0017,  -0.6062,  -0.5732,  -0.9875,  -1.1463,  0.5858,  -0.8481,  0.4205,  -4.9916,  -0.4664,  -2.0909,  0.0459,  -0.0332,  -4.0089,  -1.8024,  -2.8901,  2.3812,  -1.3477,  -0.7843,  0.7348,  0.3088,  -2.0684,  3.9286,  -0.1678,  3.0002,  1.3361,  -0.4241,  -4.2783,  1.6295,  -0.9256,  1.17,  2.0538,  1.0901,  0.3818,  -0.0925,  -0.2231,  -0.2537,  -2.5418,  1.1916,  2.1872,  -0.0569,  -3.3081,  2.2052,  1.1699,  0.0263,  -0.4186,  1.5819,  1.4526,  -2.4576,  -2.6917,  -0.1019,  -1.7189,  -1.2928,  -0.2348,  1.1214,  0.7832,  -0.9894,  -0.9703,  -0.9679,  -0.5057,  0.7279,  1.0462,  2.8508,  3.4948,  -1.9234,  2.1378,  1.5247,  -2.0323,  1.8361,  1.8045,  3.564,  -0.6524,  2.1444,  -1.5848,  1.5027,  2.2496,  2.5593,  2.0505,  4.1331,  -1.595,  -3.9967,  1.2839,  2.2204,  1.1235,  1.0393,  -1.7293,  2.141,  0.232,  0.8446,  0.6475,  -1.7222,  -0.824,  0.99];
 const PLAY_BASE = 1.5;   // 玩家模式的 1× = AI 训练速度的 1.5 倍
 const SLOWER = ['调慢了？懂了，手残模式。', '慢动作也救不了你。', '要不要再慢一点？我等你。', '这个速度，我奶奶都能过。'];
 const FASTER = ['哦哟，不错哦。', '胆子挺大嘛。', '加速？我喜欢。', '这么自信？待会别哭。'];
@@ -427,7 +428,7 @@ function jumpStep() {
 }
 function syncJump() {
   const box = document.getElementById('presets'); if (!box) return;
-  const P = state.level === 'hell' ? [[30, '30 进进阶关'], [70, '70 换大脑'], [120, '120 被门挡'], [224, '224 首次通关'], [260, '260']] : [[1, '1'], [10, '10 首次通关'], [30, '30']];
+  const P = state.level === 'hell' ? [[30, '30 进进阶关'], [70, '70 换大脑'], [140, '140 被门挡'], [200, '200 又卡住了'], [277, '277 首次通关'], [310, '310']] : [[1, '1'], [10, '10 首次通关'], [30, '30']];
   box.innerHTML = P.map(([g, t]) => `<button data-g="${g}">${t}</button>`).join('');
   box.querySelectorAll('button').forEach(b => b.onclick = () => { jumpTo(+b.dataset.g); b.blur(); });
 }
@@ -435,11 +436,11 @@ function newPlay(withAI) {
   hideTaunt();
   const hell = state.level === 'hell';
   let s;
-  if (hell) { s = new HellSim({ seed: 1, genomes: [HELL_CHAMP], gen0: 260 }); s.runners = withAI ? [s.runners[0]] : []; if (withAI) s.runners[0].off = -110; }
+  if (hell) { s = new HellSim({ seed: 1, genomes: [HELL_CHAMP], gen0: 310 }); s.runners = withAI ? [s.runners[0]] : []; if (withAI) s.runners[0].off = -110; }
   else { s = new Sim({ fixed: state.fixed !== false }); if (withAI && CHAMPION) { s.genomes = [Float32Array.from(CHAMPION)]; s.runners = [makeRunner(0, s.genomes[0], rng(1))]; s.runners[0].off = -110; } else s.runners = []; s.gen = withAI ? 30 : 0; }
   state.human = hell ? makeRunner2(-1, null, rng(1)) : makeRunner(-1, null, rng(1)); state.human.off = 0;
-  state.humanSim = s; state.press = false; state.started = false;
-  msg(hell ? '进阶关：13种陷阱，每一种都有一点点破绽。\n按空格／点屏幕开始，按住跳得更高' : '按空格／点屏幕开始，按住跳得更高', 0);
+  state.humanSim = s; state.press = false; state.started = false; state.deadT = 0;
+  msg(hell ? '进阶关：20种陷阱，每一种都有一点点破绽。\n按空格／点屏幕开始，按住跳得更高' : '按空格／点屏幕开始，按住跳得更高', 0);
 }
 function msg(t, ms = 1800) { const m = document.getElementById('msg'); m.textContent = t; clearTimeout(msg.h); if (ms) msg.h = setTimeout(() => m.textContent = '', ms); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
@@ -484,7 +485,7 @@ function loop() {
       if (!R.alive) {
         const lv = hell ? 'hell' : 'easy', m = Math.round(R.dist / PX_PER_M); state.best[lv] = Math.max(state.best[lv], m);
         if (R.win) msg(hell ? `你通关了进阶关？！${deaths('hell')} 次死亡换来的。截图发评论区，我认输。` : '新手村通关！去进阶关试试？', 0);
-        else { showTaunt(R, lv); msg('', 1); }
+        else { showTaunt(R, lv); msg('', 1); state.deadT = performance.now(); }
       }
     }
     if (!state.started || !R.alive) state.acc = 0;
@@ -493,12 +494,21 @@ function loop() {
     ctx.fillText(`${Math.round(R.dist / PX_PER_M)} m`, 60, 96);
     ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillStyle = 'rgba(246,238,227,.7)';
     ctx.fillText(`${hell ? '进阶关' : '新手村'} · 死亡 ${deaths(hell ? 'hell' : 'easy')} 次 · 最远 ${state.best[hell ? 'hell' : 'easy']} m${state.pspd !== 1 ? ' · ' + state.pspd + '× 速度' : ''}`, 60, 140);
+    if (!R.alive && !R.win && state.deadT) {   // 死亡动画：死亡地点慢慢飘起一个“菜”，3 秒后才能重来
+      const age = (performance.now() - state.deadT) / 1000, left = Math.max(0, 3 - age);
+      const sx = R.deathAt - (s.W0 - RX), y = Math.min(GROUND, R.deathY ?? R.y) - 110 - Math.min(age, 3) * 40;
+      ctx.save(); ctx.globalAlpha = Math.min(1, age * 2.5); ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+      ctx.font = `900 ${Math.round(90 + Math.min(age, 3) * 25)}px "Noto Sans SC",sans-serif`; ctx.lineWidth = 12; ctx.strokeStyle = '#173312'; ctx.strokeText('菜', sx, y);
+      ctx.fillStyle = '#7bd65a'; ctx.fillText('菜', sx, y); ctx.restore();
+      const t4 = document.querySelector('#taunt .t4'); const want = left > 0 ? `${Math.ceil(left)} 秒后才能再来……` : '按空格／点一下 再来';
+      if (t4 && t4.textContent !== want) t4.textContent = want;
+    }
     if (s.runners.length && s.runners[0].alive) { const A = s.runners[0]; ctx.fillStyle = '#9fd0ff'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('AI', RX + A.off + 2, A.y - 108); ctx.textAlign = 'left'; }
-    if (s.runners.length) { const A = s.runners[0]; ctx.fillStyle = C.text; ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillText(`第${hell ? 260 : 30}代AI：${A.alive ? '还在跑' : (A.win ? '已通关' : A.how + ' ' + Math.round(A.dist / PX_PER_M) + ' m')}`, 60, 180); }
+    if (s.runners.length) { const A = s.runners[0]; ctx.fillStyle = C.text; ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillText(`第${hell ? 310 : 30}代AI：${A.alive ? '还在跑' : (A.win ? '已通关' : A.how + ' ' + Math.round(A.dist / PX_PER_M) + ' m')}`, 60, 180); }
   }
   if (!window.REC_MODE) requestAnimationFrame(loop);
 }
-function down() { if (state.mode === 'train') return; if (!state.human.alive) { newPlay(state.mode === 'race'); return; } if (!state.started) { state.started = true; msg('', 1); } state.press = true; }
+function down() { if (state.mode === 'train') return; if (!state.human.alive) { if (!state.human.win && state.deadT && performance.now() - state.deadT < 3000) return; newPlay(state.mode === 'race'); return; } if (!state.started) { state.started = true; msg('', 1); } state.press = true; }
 function up() { state.press = false; }
 addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); if (!e.repeat) down(); } });
 addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp') up(); });
@@ -507,7 +517,7 @@ function restart() { if (state.mode === 'train') newTrain(); else newPlay(state.
 function syncUI() {
   document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x.dataset.mode === state.mode));
   document.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('on', x.dataset.level === state.level));
-  document.querySelector('[data-mode=race]').textContent = state.level === 'hell' ? '挑战第260代' : '挑战第30代';
+  document.querySelector('[data-mode=race]').textContent = state.level === 'hell' ? '挑战第310代' : '挑战第30代';
   document.querySelectorAll('.trainonly').forEach(x => x.style.display = state.mode === 'train' ? '' : 'none');
   document.querySelectorAll('.playonly').forEach(x => x.style.display = state.mode === 'train' ? 'none' : '');
   if (state.level === 'hell') { document.getElementById('course').style.display = 'none'; document.getElementById('brainbtn').style.display = 'none'; }
@@ -524,13 +534,14 @@ document.getElementById('brainbtn').onclick = e => { state.view.brain = !state.v
 //@@HELL_START
 // ====== 第二关：地狱 ======
 const HELL_SPEED = 12;
-const KINDS = ['pit', 'block', 'sign', 'crack', 'hblock', 'charger', 'paper', 'mimic', 'crusher', 'pad', 'backstab', 'fakebug', 'widen', 'flybug', 'gate', 'fakeland'];
-const NI2 = 26, NH2 = 12, NO2 = 2;
+const KINDS = ['pit', 'block', 'sign', 'crack', 'hblock', 'charger', 'paper', 'mimic', 'crusher', 'pad', 'backstab', 'fakebug', 'widen', 'flybug', 'gate', 'fakeland', 'hidpit', 'mirror', 'dropbug', 'conveyor', 'popspike', 'movpit', 'ceiling'];
+const NI2 = 33, NH2 = 12, NO2 = 2;   // 输入：距离、宽、高、23种类型、2个机关状态、下一个、背后、速度、高度、竖直速度
 const NPARAM2 = NI2 * NH2 + NH2 + NH2 * NO2 + NO2 + NI2 * NO2;   // 最后一段：输入直通输出的“反射神经”
-const TRAP_NAME = { crack: '豆腐渣地板', hblock: '隐形砖', charger: '冲锋Bug', paper: '纸老虎', mimic: '假终点', crusher: '偷看你的404', pad: '加速板', backstab: '背刺Bug', fakebug: '假Bug真坑', widen: '会长大的坑', flybug: '飞虫', gate: '犹豫之门', fakeland: '假落地点' };
+const TRAP_NAME = { crack: '豆腐渣地板', hblock: '隐形砖', charger: '冲锋Bug', paper: '纸老虎', mimic: '假终点', crusher: '偷看你的404', pad: '加速板', backstab: '背刺Bug', fakebug: '假Bug真坑', widen: '会长大的坑', flybug: '飞虫', gate: '犹豫之门', fakeland: '假落地点', hidpit: '隐形坑', mirror: '学人精Bug', dropbug: '天降Bug', conveyor: '加速带', popspike: '地刺', movpit: '会走的坑', ceiling: '低天花板' };
 const HOW = {
   pit: '掉进坑里', block: '撞上Bug', sign: '撞上验证码', crack: '地板塌了', hblock: '被隐形砖弹进坑里', charger: '被冲锋Bug撞飞', paper: '撞上隐形刺',
-  mimic: '被终点吃掉', crusher: '被压扁', pad: '被弹上天花板', backstab: '被背刺', fakebug: '掉进陷阱门', widen: '坑变宽了', flybug: '被飞虫撞到', gate: '被关在门外', fakeland: '假落地点塌了'
+  mimic: '被终点吃掉', crusher: '被压扁', pad: '被弹上天花板', backstab: '被背刺', fakebug: '掉进陷阱门', widen: '坑变宽了', flybug: '被飞虫撞到', gate: '被关在门外', fakeland: '假落地点塌了',
+  hidpit: '掉进看不见的坑', mirror: '被学人精Bug顶到', dropbug: '被天上掉下来的Bug砸中', conveyor: '跑太快掉进坑里', popspike: '被地刺扎到', movpit: '坑自己走过来了', ceiling: '撞上天花板'
 };
 const TAUNT = {
   pit: ['坑这么大你都看不见？', '重力：谢谢惠顾。', '建议下次带降落伞。'],
@@ -548,7 +559,14 @@ const TAUNT = {
   widen: ['坑也是会长大的。', '你在成长，坑也是。'],
   flybug: ['它飞得比你想得还低。', '节奏感：零分。'],
   gate: ['门本来是开着的，是你自己犹豫的。', '犹豫就会败北。', '跳什么跳，走过去就好了。'],
-  fakeland: ['落地的地方也要看清楚喔～', '跳过去了，然后呢？']
+  fakeland: ['落地的地方也要看清楚喔～', '跳过去了，然后呢？'],
+  hidpit: ['看不见的坑，才是好坑。', '眼睛是用来看的，不是用来眨的。'],
+  mirror: ['它学你跳，你倒是跳高一点啊。', '模仿是最高级的嘲讽。'],
+  dropbug: ['Bug从天而降，你从人间消失。', '抬头看看影子嘛。'],
+  conveyor: ['跑这么快，赶着投胎？', '速度与激情，主要是激情。'],
+  popspike: ['地板会长刺，正常。', '扎心了吧？'],
+  movpit: ['坑也有腿，懂？', '你在找坑，坑也在找你。'],
+  ceiling: ['跳那么高，天花板都替你疼。', '低调点，字面意思。']
 };
 const STREAK = [[100, '一百次了。要不要考虑换个游戏？'], [50, '键盘还好吗？'], [30, '桌子还在吗？'], [10, '要不要休息一下？']];
 
@@ -557,8 +575,19 @@ function hellCourse() {
     { k: 'crack', w: 160 }, { k: 'block', w: 70, h: 90 }, { k: 'hblock', w: 120 }, { k: 'paper', w: 60 }, { k: 'charger', w: 60 },
     { k: 'pit', w: 180 }, { k: 'fakebug', w: 60, h: 90, td: 420 }, { k: 'sign', w: 110 }, { k: 'pad', w: 80 }, { k: 'crusher', w: 120 },
     { k: 'widen', w: 120 }, { k: 'backstab', w: 50 }, { k: 'gate', w: 50 }, { k: 'flybug', w: 60 }, { k: 'fakeland', w: 140, w2: 200 },
-    { k: 'block', w: 60, h: 120, gap: 420 }, { k: 'crack', w: 140 }, { k: 'sign', w: 100, gap: 560 }, { k: 'paper', w: 60 },
-    { k: 'charger', w: 60, gap: 650 }, { k: 'hblock', w: 120 }, { k: 'mimic', w: 40 },
+    // 后半段：7种新陷阱
+    { k: 'hidpit', w: 160 }, { k: 'mirror', w: 60, h: 70 }, { k: 'conveyor', w: 500 }, { k: 'dropbug', w: 70, h: 90 },
+    { k: 'popspike', w: 100 }, { k: 'movpit', w: 180 }, { k: 'ceiling', w: 80 },
+    // 组合：陷阱互相配合
+    { k: 'crack', w: 140 }, { k: 'hidpit', w: 150, gap: 320 },
+    { k: 'conveyor', w: 420 }, { k: 'widen', w: 110, gap: 260 },
+    { k: 'dropbug', w: 70, h: 90 }, { k: 'popspike', w: 100, gap: 380 },
+    { k: 'fakebug', w: 60, h: 90, td: 380 }, { k: 'mirror', w: 60, h: 70, gap: 520 },
+    { k: 'paper', w: 60 }, { k: 'hidpit', w: 150, gap: 120 },
+    { k: 'movpit', w: 170 }, { k: 'flybug', w: 60, gap: 420 },
+    { k: 'charger', w: 60 }, { k: 'ceiling', w: 80, gap: 900 },
+    { k: 'block', w: 60, h: 120, gap: 420 }, { k: 'sign', w: 100, gap: 560 }, { k: 'hblock', w: 120 }, { k: 'mimic', w: 40 },
+
   ];
   const obs = []; let x = 1400;
   for (const s of seq) {
@@ -578,6 +607,9 @@ function extentEnd(o, st) {
     case 'charger': return o.x + (st.dx || 0) + o.w;
     case 'gate': return o.x + o.w;
     case 'backstab': return o.x + 900;
+    case 'conveyor': return o.x + o.w + 150 + 170;
+    case 'movpit': return o.x + 200 + o.w;
+    case 'ceiling': return o.x + o.w + 250;
     default: return o.x + o.w;
   }
 }
@@ -588,6 +620,9 @@ function crusherBottom(st) {
   if (t < 24) return GROUND;
   return Math.max(GROUND - 460, GROUND - (t - 24) * 10);
 }
+function dropLift(st) { return st.fall ? Math.max(0, 900 - st.fall * 45) : 900; }
+function movS(st) { return 200 * Math.sin(2 * Math.PI * (st.t || 0) / 80); }
+function mirLift(st) { return st.y || 0; }
 function flyY(st) { return GROUND - 150 + 110 * Math.sin(2 * Math.PI * (st.t || 0) / 64); }
 const S_ = (R, k) => R.st[k] || (R.st[k] = {});
 
@@ -597,7 +632,7 @@ function stepRunner2(R, W0, obs, idx, press) {
   if (!R.alive) return;
   const px = W0 + R.off;
   if (press !== null) {
-    if (press && R.ground && !R.fall) { R.vy = JV; R.ground = false; R.held = true; R.jumps++; }
+    if (press && R.ground && !R.fall) { R.vy = JV; R.ground = false; R.held = true; R.jumps++; R.justJumped = true; }
     if (!press) { if (R.vy < CUT) R.vy = CUT; R.held = false; }
   }
   if (!R.ground) { R.vy += GRAV; R.y += R.vy; }
@@ -618,8 +653,17 @@ function stepRunner2(R, W0, obs, idx, press) {
       case 'flybug': if (px > o.x - 900) st.t = (st.t || 0) + 1; break;
       case 'gate': if (!R.ground && px > o.x - 420 && px < o.x) st.closed = true; break;
       case 'pad': if (R.ground && px > o.x - 10 && px < o.x + o.w + 10) { R.vy = -48; R.ground = false; st.launch = true; } break;
+      case 'mirror':
+        if (R.justJumped && px > o.x - 600 && px < o.x - 40 && !st.y) { st.vy = 20; st.y = 0.01; }
+        if (st.y) { st.y += st.vy; st.vy -= GRAV; if (st.y <= 0) { st.y = 0; st.vy = 0; } } break;
+      case 'dropbug': if (st.fall) st.fall++; else if (px > o.x - 700) st.fall = 1; break;
+      case 'conveyor': if (R.ground && px > o.x && px < o.x + o.w) { if (R.off0 === undefined) R.off0 = R.off; R.off += 9; st.on = true; } break;
+      case 'popspike': if (px > o.x - 200) st.up = Math.min(60, (st.up || 0) + 20); break;
+      case 'movpit': if (px > o.x - 1500) st.t = (st.t || 0) + 1; break;
     }
   }
+  R.justJumped = false;
+  if (R.off0 !== undefined && R.ground && R.off > R.off0) { let on = false; for (let k = lo; k < hi; k++) { const o = obs[k]; if (o.k === 'conveyor' && px > o.x && px < o.x + o.w) on = true; } if (!on) R.off = Math.max(R.off0, R.off - 3); }
   // 落地前：陷阱门
   if (!R.ground && !R.fall && R.y >= GROUND) {
     for (let k = lo; k < hi; k++) { const o = obs[k]; if (o.k === 'fakebug' && px > o.x + o.w && px < o.x + o.w + o.td) S_(R, k).open = true; }
@@ -633,6 +677,9 @@ function stepRunner2(R, W0, obs, idx, press) {
     else if (o.k === 'fakeland') { a = o.x; b = o.x + o.w + (st.broke ? o.w2 : 0); }
     else if (o.k === 'widen') { a = o.x; b = o.x + o.w + (st.wide ? 200 : 0); }
     else if (o.k === 'fakebug' && st.open) { a = o.x + o.w; b = o.x + o.w + o.td; }
+    else if (o.k === 'hidpit' || o.k === 'ceiling') { a = o.x; b = o.x + o.w; }
+    else if (o.k === 'conveyor') { a = o.x + o.w + 150; b = a + 170; }
+    else if (o.k === 'movpit') { a = o.x + movS(st); b = a + o.w; }
     else continue;
     if (px - 12 > a && px + 12 < b) hole = k;
     if (o.k === 'crack' || o.k === 'fakeland') { if (px > a && px < b && st.broke) hole = k; }
@@ -658,6 +705,10 @@ function stepRunner2(R, W0, obs, idx, press) {
       case 'backstab': if (st.on && hit(st.bx, st.bx + 60, GROUND - 60, GROUND)) return die2(R, W0, 'backstab', k); break;
       case 'flybug': { const c = flyY(st); if (hit(o.x, o.x + o.w, c - 30, c + 30)) return die2(R, W0, 'flybug', k); break; }
       case 'gate': if (st.closed && hit(o.x, o.x + o.w, 0, GROUND)) return die2(R, W0, 'gate', k); break;
+      case 'mirror': { const l = mirLift(st); if (hit(o.x, o.x + o.w, GROUND - o.h - l + 4, GROUND - l)) return die2(R, W0, 'mirror', k); break; }
+      case 'dropbug': { const l = dropLift(st); if (hit(o.x, o.x + o.w, GROUND - o.h - l + 4, GROUND - l)) return die2(R, W0, 'dropbug', k); break; }
+      case 'popspike': if (st.up && hit(o.x, o.x + o.w, GROUND - st.up, GROUND)) return die2(R, W0, 'popspike', k); break;
+      case 'ceiling': if (hit(o.x - 250, o.x + o.w + 250, 0, GROUND - 236)) return die2(R, W0, 'ceiling', k); break;
     }
   }
   R.dist = px;
@@ -678,22 +729,29 @@ function sense2(R, W0, obs, idx) {
     inp[0] = Math.max(-0.5, (ox - px) / 1000);
     inp[1] = (extentEnd(o, st) - o.x) / 300;
     inp[2] = (o.h || (o.k === 'charger' ? 66 : o.k === 'mimic' ? 200 : 0)) / 150;
-    inp[3 + KINDS.indexOf(o.k)] = 1;
-    if (o.k === 'crusher') { inp[19] = (GROUND - crusherBottom(st)) / 460; inp[20] = st.trig ? 1 : 0; }
-    if (o.k === 'flybug') { inp[19] = (GROUND - flyY(st)) / 300; inp[20] = Math.cos(2 * Math.PI * (st.t || 0) / 64); }
-    if (o.k === 'charger') inp[19] = st.dx ? 1 : 0;
-    if (o.k === 'widen' || o.k === 'gate') inp[19] = (st.wide || st.closed) ? 1 : 0;
+    inp[3 + KINDS.indexOf(o.k)] = o.k === 'ceiling' ? 4 : 1;   // 天花板：看得特别清楚（不然只会跳满）
+    const A = 26, B = 27;
+    if (o.k === 'crusher') { inp[A] = (GROUND - crusherBottom(st)) / 460; inp[B] = st.trig ? 1 : 0; }
+    if (o.k === 'flybug') { inp[A] = (GROUND - flyY(st)) / 300; inp[B] = Math.cos(2 * Math.PI * (st.t || 0) / 64); }
+    if (o.k === 'charger') inp[A] = st.dx ? 1 : 0;
+    if (o.k === 'widen' || o.k === 'gate') inp[A] = (st.wide || st.closed) ? 1 : 0;
+    if (o.k === 'mirror') { inp[A] = mirLift(st) / 160; inp[B] = (st.vy || 0) / 20; }
+    if (o.k === 'dropbug') inp[A] = dropLift(st) / 900;
+    if (o.k === 'conveyor') { inp[A] = (o.x + o.w + 150 - px) / 1000; inp[B] = R.off0 !== undefined ? (R.off - R.off0) / 200 : 0; }
+    if (o.k === 'popspike') inp[A] = (st.up || 0) / 60;
+    if (o.k === 'ceiling') { inp[A] = Math.max(0, (o.x + o.w + 250 - px)) / 600; inp[B] = 4 * Math.max(0, GROUND - R.y) / 140; }
+    if (o.k === 'movpit') { inp[A] = movS(st) / 200; inp[B] = Math.cos(2 * Math.PI * (st.t || 0) / 80); }
   } else inp[0] = 3;
-  inp[21] = o2 ? (o2.x - px) / 1500 : 2;
-  inp[22] = 2;
-  for (let k = Math.max(0, idx - 3); k < Math.min(obs.length, idx + 3); k++) { const st = R.st[k]; if (obs[k].k === 'backstab' && st && st.on && st.bx < px) inp[22] = (px - st.bx - 60) / 600; }
-  inp[23] = HELL_SPEED / 22;
-  inp[24] = (GROUND - R.y) / 300;
-  inp[25] = R.vy / 26;
+  inp[28] = o2 ? (o2.x - px) / 1500 : 2;
+  inp[29] = 2;
+  for (let k = Math.max(0, idx - 3); k < Math.min(obs.length, idx + 3); k++) { const st = R.st[k]; if (obs[k].k === 'backstab' && st && st.on && st.bx < px) inp[29] = (px - st.bx - 60) / 600; }
+  inp[30] = HELL_SPEED / 22;
+  inp[31] = (GROUND - R.y) / 300;
+  inp[32] = R.vy / 26;
   if (R.blind) blindView(inp, o);
 }
 // 旧大脑（新手村版）只看得懂：距离、宽度、高度、是不是坑、是不是验证码
-const LOOKS_PIT = ['pit', 'hblock', 'widen', 'fakeland'], LOOKS_SIGN = ['sign'], LOOKS_BLOCK = ['block', 'charger', 'fakebug', 'paper', 'mimic'];
+const LOOKS_PIT = ['pit', 'hblock', 'widen', 'fakeland', 'conveyor', 'movpit', 'ceiling'], LOOKS_SIGN = ['sign'], LOOKS_BLOCK = ['block', 'charger', 'fakebug', 'paper', 'mimic', 'mirror', 'dropbug'];
 function blindView(inp, o) {
   const keep = new Set(MAP9);
   for (let i = 0; i < NI2; i++) if (!keep.has(i)) inp[i] = 0;
@@ -712,7 +770,7 @@ function think2(g, inp, hid, out) {
   for (let k = 0; k < NO2; k++) out[k] = 1 / (1 + Math.exp(-out[k]));
 }
 // 把新手村的 9-8-2 大脑搬进 26-12-2 的大脑（新增的部分先全是 0）
-const MAP9 = [0, 1, 2, 3, 5, 21, 23, 24, 25];
+const MAP9 = [0, 1, 2, 3, 5, 28, 30, 31, 32];
 function expandGenome(g) {
   const n = new Float32Array(NPARAM2); let p = 0;
   for (let j = 0; j < NH; j++) for (let i = 0; i < NI; i++) n[j * NI2 + MAP9[i]] = g[p++];
@@ -849,6 +907,50 @@ function drawTrap(o, st, sx, t, ref) {
     case 'fakebug': bugBody(sx, GROUND - o.h, o.w, o.h, C.bug, t, { smirk: true, alpha: 0.9, legs: true }); if (st.open) drawHole(sx + o.w, o.td); else { ctx.strokeStyle = 'rgba(20,10,6,.25)'; ctx.lineWidth = 2; ctx.strokeRect(sx + o.w + 4, GROUND + 3, o.td - 8, 18); } break;
     case 'widen': drawHole(sx, o.w + (st.wide ? 200 : 0)); if (!st.wide) { ctx.fillStyle = 'rgba(20,10,6,.35)'; ctx.fillRect(sx + o.w, GROUND + 6, 30, 4); } break;
     case 'flybug': { const c = flyY(st); bugBody(sx, c - 30, o.w, 60, '#b85cd6', t, { wings: true, eyes: true }); break; }
+    case 'hidpit':
+      if (st.dead) drawHole(sx, o.w);
+      else {   // 破绽：地面颜色淡一点、两边有细缝、上方有一颗会闪的小亮点
+        ctx.fillStyle = 'rgba(255,225,190,.10)'; ctx.fillRect(sx, GROUND + 6, o.w, H - GROUND - 6);
+        ctx.fillStyle = 'rgba(20,10,6,.55)'; ctx.fillRect(sx - 1, GROUND + 2, 3, 30); ctx.fillRect(sx + o.w - 2, GROUND + 2, 3, 30);
+        ctx.strokeStyle = 'rgba(255,225,190,.28)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx + 4, GROUND + 3); ctx.lineTo(sx + o.w - 4, GROUND + 3); ctx.stroke(); ctx.setLineDash([]);
+        const a = 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.15)); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('✧', sx + o.w / 2, GROUND - 16);
+      }
+      break;
+    case 'mirror': {
+      const l = mirLift(st), y = GROUND - o.h - l;
+      bugBody(sx, y, o.w, o.h, '#e07ab0', t, { eyes: true, smirk: true });
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 3; ctx.beginPath(); for (let z = 0; z <= 6; z++) ctx.lineTo(sx + o.w / 2 + (z % 2 ? 9 : -9), GROUND - l + (z / 6) * Math.max(8, l)); ctx.stroke();
+      break;
+    }
+    case 'dropbug': {
+      const l = dropLift(st), k = 1 - l / 900;
+      ctx.fillStyle = `rgba(0,0,0,${0.15 + 0.35 * k})`; ctx.beginPath(); ctx.ellipse(sx + o.w / 2, GROUND + 4, o.w * (0.35 + 0.5 * k), 7, 0, 0, 7); ctx.fill();
+      if (l < 900) bugBody(sx, GROUND - o.h - l, o.w, o.h, '#d9534f', t, { eyes: true, legs: l === 0 });
+      break;
+    }
+    case 'conveyor': {
+      ctx.fillStyle = '#55504a'; ctx.fillRect(sx, GROUND - 4, o.w, 14);
+      ctx.fillStyle = '#ffcf5a'; ctx.font = 'bold 20px monospace'; ctx.textAlign = 'left';
+      for (let x = (t * 6) % 40; x < o.w - 20; x += 40) ctx.fillText('»', sx + x, GROUND + 9);
+      drawHole(sx + o.w + 150, 170);
+      break;
+    }
+    case 'popspike':
+      if (st.up) { ctx.fillStyle = '#ddd'; for (let k = 0; k < o.w / 20; k++) { const x = sx + k * 20; ctx.beginPath(); ctx.moveTo(x, GROUND); ctx.lineTo(x + 10, GROUND - st.up); ctx.lineTo(x + 20, GROUND); ctx.fill(); } }
+      else { ctx.fillStyle = 'rgba(10,5,3,.45)'; for (let k = 0; k < o.w / 20; k++) { ctx.beginPath(); ctx.arc(sx + 10 + k * 20, GROUND + 3, 2.5, 0, 7); ctx.fill(); } }
+      break;
+    case 'movpit': {
+      const m = movS(st); drawHole(sx + m, o.w);
+      ctx.fillStyle = 'rgba(255,207,90,.35)'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⇠  ⇢', sx + m + o.w / 2, GROUND + 60);
+      break;
+    }
+    case 'ceiling': {
+      const x0 = sx - 250, w = o.w + 500;
+      ctx.fillStyle = '#3b3540'; ctx.fillRect(x0, 0, w, GROUND - 260);
+      ctx.fillStyle = '#ddd'; for (let k = 0; k < w / 24; k++) { const x = x0 + k * 24; ctx.beginPath(); ctx.moveTo(x, GROUND - 260); ctx.lineTo(x + 12, GROUND - 236); ctx.lineTo(x + 24, GROUND - 260); ctx.fill(); }
+      drawHole(sx, o.w);
+      break;
+    }
     case 'gate': {
       ctx.fillStyle = '#5b3a2a'; ctx.fillRect(sx - 40, GROUND - 330, 40, 330); ctx.fillRect(sx + o.w, GROUND - 330, 40, 330); ctx.fillRect(sx - 40, GROUND - 360, o.w + 80, 34);
       ctx.fillStyle = '#e8e2d6'; ctx.font = '30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('💀', sx + o.w / 2, GROUND - 334);
@@ -862,7 +964,7 @@ function drawTrap(o, st, sx, t, ref) {
 window.API = { HellSim, hellCourse, KINDS, TAUNT, HOW, TRAP_NAME, makeRunner2, stepRunner2, sense2, think2, expandGenome, crusherBottom, flyY, extentEnd, CHAMPION, Sim, makeCourse, drawWorld, drawHUD, drawGirl, drawBrain, state, ctx, W, H, FINISH, PX_PER_M, POP, speedAt, makeRunner, sense, think, stepRunner, rng };
 window.REC_MODE = location.hash.includes('record');
 if (window.REC_MODE) document.body.classList.add('rec');
-if (location.hash.includes('clip')) { window.REC_MODE = true; syncUI(); newPlay(false); window.CLIP = { loop, down, up }; }
+if (location.hash.includes('clip')) { window.REC_MODE = true; document.body.classList.add('clip'); syncUI(); newPlay(false); window.CLIP = { loop, down, up }; }
 else if (!window.REC_MODE) { syncUI(); newPlay(false); loop(); }
 </script>
 </body>
