@@ -363,31 +363,76 @@ function drawHUD(sim, view) {
     ctx.fillText(`距离 ${Math.round((lead ? lead.dist : sim.W0) / PX_PER_M)} m`, 60, 188);
     ctx.fillStyle = 'rgba(246,238,227,.65)'; ctx.fillText(`历史最佳 ${Math.round(sim.best / PX_PER_M)} m`, 60, 230);
   }
-  if (view.brain) drawBrain(sim.leader() || view.lastLead, 1340, 50, 520, 300);
+  if (view.brain) drawBrain(sim.leader() || view.lastLead, 1250, 30, 650, 440, sim.frame);
 }
-function drawBrain(R, x, y, w, h) {
-  if (!R || R.inp.length !== NI) return;
-  ctx.save(); ctx.fillStyle = 'rgba(20,16,12,.72)'; roundRect(x, y, w, h, 18); ctx.fill();
-  ctx.fillStyle = '#f6eee3'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText('领跑者的大脑', x + 18, y + 34);
-  const labels = ['前方距离', '障碍宽度', 'Bug高度', '是坑', '是验证码', '下一个', '速度', '离地高度', '上下速度'];
-  const outL = ['起跳', '按住'];
-  const L0 = [], L1 = [], L2 = [];
-  for (let i = 0; i < NI; i++) L0.push([x + 130, y + 62 + i * (h - 80) / (NI - 1)]);
-  for (let j = 0; j < NH; j++) L1.push([x + 290, y + 70 + j * (h - 96) / (NH - 1)]);
-  for (let k = 0; k < NO; k++) L2.push([x + 430, y + 120 + k * 110]);
+//@@BRAIN_START
+// ====== 花俏版大脑面板：输入分组 → 12 个“性格神经元” → 跳／按住，外加“反射神经”与内心OS ======
+const HID_NAMES = ['求生欲', '怂', '莽', '犹豫', '直觉', '玄学', '手感', '乐观', '焦虑', '记仇', '佛系', '好奇'];
+const IN_GROUPS_2 = [['👀 前面多远', [0]], ['📏 有多宽', [1]], ['📐 有多高', [2]], ['🔎 认出是啥', 'kind'], ['⚙️ 机关状态', [26, 27]], ['⏭️ 下一个', [28]], ['👻 背后', [29]], ['🦘 离地多高', [31]], ['↕️ 上下速度', [32]]];
+const IN_GROUPS_1 = [['👀 前面多远', [0]], ['📏 有多宽', [1]], ['📐 Bug多高', [2]], ['🕳️ 是坑', [3]], ['🧩 是验证码', [4]], ['⏭️ 下一个', [5]], ['💨 速度', [6]], ['🦘 离地多高', [7]], ['↕️ 上下速度', [8]]];
+function drawBrain(R, x, y, w, h, t = 0) {
+  if (!R || !R.inp) return;
+  const big = R.inp.length === NI2, ni = R.inp.length, nh = big ? NH2 : NH, groups = big ? IN_GROUPS_2 : IN_GROUPS_1;
+  const idx = gi => gi[1] === 'kind' ? Array.from({ length: KINDS.length }, (_, k) => 3 + k) : gi[1];
+  const gAct = groups.map(gr => { let m = 0; for (const i of idx(gr)) if (Math.abs(R.inp[i]) > Math.abs(m)) m = R.inp[i]; return Math.tanh(m); });
+  ctx.save();
+  // 面板
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.15);
+  ctx.shadowColor = 'rgba(255,150,70,.55)'; ctx.shadowBlur = 18 + 10 * pulse;
+  ctx.fillStyle = 'rgba(14,10,18,.84)'; roundRect(x, y, w, h, 20); ctx.fill(); ctx.shadowBlur = 0;
+  const gb = ctx.createLinearGradient(x, y, x + w, y + h); gb.addColorStop(0, '#ff9a4a'); gb.addColorStop(0.5, '#ff5fa2'); gb.addColorStop(1, '#6ab8ff');
+  ctx.strokeStyle = gb; ctx.lineWidth = 3; roundRect(x, y, w, h, 20); ctx.stroke();
+  ctx.fillStyle = '#fff6ea'; ctx.font = 'bold 24px "Noto Sans SC",sans-serif'; ctx.textAlign = 'left'; ctx.fillText('🧠 领跑者的大脑', x + 18, y + 36);
+  ctx.fillStyle = 'rgba(246,238,227,.55)'; ctx.font = '16px "Noto Sans SC",sans-serif'; ctx.fillText(`${(big ? NPARAM2 : 106)} 个数字 · 全靠进化`, x + 220, y + 34);
+  const top = y + 64, bot = y + h - 22;
+  const L0 = groups.map((_, i) => [x + 180, top + i * (bot - top) / (groups.length - 1)]);
+  const L1 = Array.from({ length: nh }, (_, j) => [x + 360, top + 6 + j * (bot - top - 12) / (nh - 1)]);
+  const L2 = [[x + 520, y + h * 0.36], [x + 520, y + h * 0.64]];
   const g = R.g; let p = 0;
-  for (let j = 0; j < NH; j++) for (let i = 0; i < NI; i++) { const wv = g[p++]; edge(L0[i], L1[j], wv, R.inp[i]); }
-  p += NH;
-  for (let k = 0; k < NO; k++) for (let j = 0; j < NH; j++) { const wv = g[p++]; edge(L1[j], L2[k], wv, R.hid[j]); }
-  ctx.font = '15px "Noto Sans SC",sans-serif'; ctx.textAlign = 'right';
-  for (let i = 0; i < NI; i++) { node(L0[i], Math.tanh(R.inp[i]), 8); ctx.fillStyle = '#d8ccbc'; ctx.fillText(labels[i], L0[i][0] - 14, L0[i][1] + 5); }
-  for (let j = 0; j < NH; j++) node(L1[j], R.hid[j], 9);
-  ctx.textAlign = 'left';
-  for (let k = 0; k < NO; k++) { node(L2[k], R.out[k] * 2 - 1, 13); ctx.fillStyle = R.out[k] > 0.5 ? '#ffb46b' : '#9c8a76'; ctx.font = 'bold 18px "Noto Sans SC",sans-serif'; ctx.fillText(outL[k], L2[k][0] + 20, L2[k][1] + 6); }
+  // 输入→隐藏（按组合并权重）
+  const W1 = Array.from({ length: nh }, () => new Float32Array(groups.length));
+  for (let j = 0; j < nh; j++) { for (let i = 0; i < ni; i++) { const gIx = groups.findIndex(gr => idx(gr).includes(i)); if (gIx >= 0) W1[j][gIx] += g[p] * R.inp[i]; p++; } }
+  p += nh;
+  const W2 = [[], []]; for (let k = 0; k < NO; k++) for (let j = 0; j < nh; j++) W2[k][j] = g[p++] * R.hid[j];
+  p += NO;
+  const SK = [[], []]; if (big) for (let k = 0; k < NO; k++) for (let i = 0; i < ni; i++) { const gIx = groups.findIndex(gr => idx(gr).includes(i)); SK[k][gIx] = (SK[k][gIx] || 0) + g[p++] * R.inp[i]; }
+  const edge = (a, b, v, seed, curve = 0) => {
+    const s = Math.min(1, Math.abs(v) * 0.6); if (s < 0.05) return;
+    const col = v > 0 ? `rgba(255,150,70,${0.12 + s * 0.7})` : `rgba(106,184,255,${0.12 + s * 0.7})`;
+    ctx.strokeStyle = col; ctx.lineWidth = 0.8 + s * 3.2; ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 - curve; ctx.quadraticCurveTo(mx, my, b[0], b[1]); ctx.stroke();
+    if (s > 0.35) { const u = ((t * 0.045 + seed * 0.137) % 1); const qx = (1 - u) * (1 - u) * a[0] + 2 * u * (1 - u) * mx + u * u * b[0], qy = (1 - u) * (1 - u) * a[1] + 2 * u * (1 - u) * my + u * u * b[1];
+      ctx.fillStyle = v > 0 ? '#ffd9a8' : '#cfe8ff'; ctx.beginPath(); ctx.arc(qx, qy, 2.5 + s * 2, 0, 7); ctx.fill(); }
+  };
+  for (let j = 0; j < nh; j++) for (let i = 0; i < groups.length; i++) edge(L0[i], L1[j], W1[j][i], i * 13 + j);
+  for (let k = 0; k < NO; k++) for (let j = 0; j < nh; j++) edge(L1[j], L2[k], W2[k][j], j * 7 + k);
+  if (big) { ctx.setLineDash([5, 6]); for (let k = 0; k < NO; k++) for (let i = 0; i < groups.length; i++) edge(L0[i], L2[k], (SK[k][i] || 0) * 0.7, i + 50 * k, 120 + i * 6); ctx.setLineDash([]); }
+  const node = (c, v, r, glow) => {
+    const a = Math.min(1, Math.abs(v)); ctx.shadowColor = v > 0 ? '#ff9a4a' : '#6ab8ff'; ctx.shadowBlur = glow ? 6 + a * 18 : 0;
+    ctx.fillStyle = v > 0 ? `rgba(255,150,70,${0.25 + a * 0.75})` : `rgba(106,184,255,${0.25 + a * 0.75})`;
+    ctx.beginPath(); ctx.arc(c[0], c[1], r * (1 + 0.15 * a), 0, 7); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,246,234,.8)'; ctx.lineWidth = 1.2; ctx.stroke();
+  };
+  ctx.textAlign = 'right'; ctx.font = '17px "Noto Sans SC",sans-serif';
+  groups.forEach((gr, i) => { node(L0[i], gAct[i], 8, true); ctx.fillStyle = Math.abs(gAct[i]) > 0.3 ? '#fff6ea' : 'rgba(216,204,188,.6)'; ctx.fillText(gr[0], L0[i][0] - 14, L0[i][1] + 6); });
+  ctx.textAlign = 'left'; ctx.font = '15px "Noto Sans SC",sans-serif';
+  let hot = 0; for (let j = 0; j < nh; j++) if (Math.abs(R.hid[j]) > Math.abs(R.hid[hot])) hot = j;
+  for (let j = 0; j < nh; j++) { node(L1[j], R.hid[j], 8, true); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(14,10,18,.9)'; ctx.strokeText(HID_NAMES[j], L1[j][0] + 13, L1[j][1] + 5); ctx.fillStyle = j === hot ? '#ffd34d' : 'rgba(216,204,188,.75)'; ctx.fillText(HID_NAMES[j], L1[j][0] + 13, L1[j][1] + 5); }
+  if (big) { ctx.fillStyle = 'rgba(255,95,162,.8)'; ctx.font = 'bold 14px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡ 反射神经', x + 455, y + 52); }
+  const outL = ['跳！', '按住'];
+  for (let k = 0; k < NO; k++) {
+    const on = R.out[k] > 0.5; node(L2[k], R.out[k] * 2 - 1, 15, true);
+    if (on) { ctx.strokeStyle = `rgba(255,211,77,${0.6 - ((t * 0.08) % 0.6)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(L2[k][0], L2[k][1], 18 + ((t * 2) % 22), 0, 7); ctx.stroke(); }
+    ctx.fillStyle = on ? '#ffd34d' : 'rgba(216,204,188,.6)'; ctx.font = `bold ${on ? 24 : 20}px "Noto Sans SC",sans-serif`; ctx.textAlign = 'left'; ctx.fillText(outL[k], L2[k][0] + 24, L2[k][1] + 8);
+  }
+  // 内心OS
+  const os = !R.alive ? '……' : R.ground ? (R.out[0] > 0.5 ? '冲！' : Math.abs(R.hid[hot]) > 0.9 ? `（${HID_NAMES[hot]}中）` : '稳住……') : (R.out[1] > 0.5 ? '再高一点！' : '收！');
+  ctx.font = 'bold 20px "Noto Sans SC",sans-serif'; const tw = ctx.measureText(os).width + 26, bx = x + w - tw - 16, by = y + h - 58;
+  ctx.fillStyle = 'rgba(255,246,234,.95)'; roundRect(bx, by, tw, 38, 12); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(bx + tw - 30, by); ctx.lineTo(bx + tw - 18, by - 12); ctx.lineTo(bx + tw - 14, by); ctx.fill();
+  ctx.fillStyle = '#2a1810'; ctx.textAlign = 'center'; ctx.fillText(os, bx + tw / 2, by + 26);
   ctx.restore();
-  function edge(a, b, wv, act) { ctx.strokeStyle = wv > 0 ? `rgba(239,138,58,${Math.min(.85, .08 + Math.abs(wv * act) * .5)})` : `rgba(122,167,217,${Math.min(.85, .08 + Math.abs(wv * act) * .5)})`; ctx.lineWidth = Math.min(4, Math.abs(wv) * 1.4); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
-  function node(c, v, r) { ctx.fillStyle = v > 0 ? `rgba(239,138,58,${.25 + Math.abs(v) * .75})` : `rgba(122,167,217,${.25 + Math.abs(v) * .75})`; ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#f6eee3'; ctx.lineWidth = 1.2; ctx.stroke(); }
 }
+//@@BRAIN_END
 
 // ====== 第30代冠军（训练后贴进来） ======
 const CHAMPION = [1.9186, -0.4169, 0.9499, -0.1508, 0.0445, -0.9796, -0.0298, 1.4838, 0.7827, -1.8202, -1.573, -0.0909, -1.3658, -1.3883, -0.1289, -0.6757, 0.3427, 1.1116, 2.7711, 0.5912, -0.6194, 0.8641, 0.1911, -0.7464, -1.1732, 0.2041, 1.3466, -2.1662, 0.6241, -1.1579, 0.5618, -0.4152, 1.966, 2.8249, -0.2182, -0.753, 2.6904, 1.3057, -0.4335, -1.0841, -0.7806, 0.032, 0.7737, -1.3941, -1.5663, 0.8349, -0.3672, 0.2488, -0.9571, -0.6485, -1.907, -1.0924, 1.0211, 0.5721, -1.3689, -0.0324, 0.2332, 2.0352, -0.6309, -0.6098, -1.1431, -0.5618, -1.4459, 3.2827, 1.6398, -0.4931, -1.6919, 0.7485, 0.4229, -0.955, 0.4305, 0.6454, -0.5808, 0.984, 0.4817, -0.2583, -0.084, -3.879, 0.053, -0.0283, -0.6396, 0.6566, -0.9973, -0.5696, -0.0017, -0.0188, 0.4349, -1.8375, -0.2649, -1.0819, -1.9435, 2.0007, -0.1476, -0.8179, -0.0707, -0.2918, 0.4846, 0.8828];
@@ -500,8 +545,9 @@ function loop() {
       ctx.save(); ctx.globalAlpha = Math.min(1, age * 2.5); ctx.textAlign = 'center'; ctx.lineJoin = 'round';
       ctx.font = `900 ${Math.round(90 + Math.min(age, 3) * 25)}px "Noto Sans SC",sans-serif`; ctx.lineWidth = 12; ctx.strokeStyle = '#173312'; ctx.strokeText('菜', sx, y);
       ctx.fillStyle = '#7bd65a'; ctx.fillText('菜', sx, y); ctx.restore();
-      const t4 = document.querySelector('#taunt .t4'); const want = left > 0 ? `${Math.ceil(left)} 秒后才能再来……` : '按空格／点一下 再来';
-      if (t4 && t4.textContent !== want) t4.textContent = want;
+      const t4 = document.querySelector('#taunt .t4'), pct = Math.round(Math.min(1, age / 3) * 50) * 2;
+      const want = left > 0 ? `<span style="display:inline-block;width:220px;height:10px;border-radius:5px;background:linear-gradient(90deg,#e8833a ${pct}%,rgba(255,255,255,.12) ${pct}%)"></span>` : '按空格／点一下 再来';
+      if (t4 && t4.dataset.w !== want) { t4.dataset.w = want; t4.innerHTML = want; }
     }
     if (s.runners.length && s.runners[0].alive) { const A = s.runners[0]; ctx.fillStyle = '#9fd0ff'; ctx.font = 'bold 22px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('AI', RX + A.off + 2, A.y - 108); ctx.textAlign = 'left'; }
     if (s.runners.length) { const A = s.runners[0]; ctx.fillStyle = C.text; ctx.font = '26px "Noto Sans SC",sans-serif'; ctx.fillText(`第${hell ? 310 : 30}代AI：${A.alive ? '还在跑' : (A.win ? '已通关' : A.how + ' ' + Math.round(A.dist / PX_PER_M) + ' m')}`, 60, 180); }
